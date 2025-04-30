@@ -1,0 +1,50 @@
+[0414/132657.144:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Feature xr-spatial-tracking's parameters are ignored.", source:  (0)
+[0414/132657.144:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'attribution-reporting'.", source:  (0)
+[0414/132657.144:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'compute-pressure'.", source:  (0)
+[0414/132657.144:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'interest-cohort'.", source:  (0)
+[0414/132657.144:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-issuance'.", source:  (0)
+[0414/132657.145:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'shared-storage'.", source:  (0)
+[0414/132657.145:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'shared-storage-select-url'.", source:  (0)
+[0414/132657.145:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-redemption'.", source:  (0)
+[0414/132657.145:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'unload'.", source:  (0)
+[0414/132657.145:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'window-management'.", source:  (0)
+[0414/132658.839:INFO:CONSOLE(153)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/yr/r/MzdFvjGReLO.js (153)
+[0414/132830.299:INFO:CONSOLE(153)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/yr/r/MzdFvjGReLO.js (153)
+[0414/132832.690:INFO:CONSOLE(273)] "Uncaught (in promise) #<a>", source: https://static.whatsapp.net/rsrc.php/v4/yg/r/pQcKy7jnzUB.js (273)
+[0414/132832.690:INFO:CONSOLE(273)] "Uncaught (in promise) #<a>", source: https://static.whatsapp.net/rsrc.php/v4/yg/r/pQcKy7jnzUB.js (273)
+[0414/132832.690:INFO:CONSOLE(273)] "Uncaught (in promise) #<a>", source: https://static.whatsapp.net/rsrc.php/v4/yg/r/pQcKy7jnzUB.js (273)
+[0414/132832.690:INFO:CONSOLE(273)] "Uncaught (in promise) #<a>", source: https://static.whatsapp.net/rsrc.php/v4/yg/r/pQcKy7jnzUB.js (273)
+[0414/132832.691:INFO:CONSOLE(273)] "Uncaught (in promise) #<a>", source: https://static.whatsapp.net/rsrc.php/v4/yg/r/pQcKy7jnzUB.js (273)
+[0414/132832.699:INFO:CONSOLE(273)] "Uncaught (in promise) Error: [comms] sendIq called before startComms", source: https://static.whatsapp.net/rsrc.php/v4/yg/r/pQcKy7jnzUB.js (273)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Feature xr-spatial-tracking's parameters are ignored.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'attribution-reporting'.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'compute-pressure'.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'interest-cohort'.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-issuance'.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'shared-storage'.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'shared-storage-select-url'.", source:  (0)
+[0414/132832.923:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-redemption'.", source:  (0)
+[0414/132832.924:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'unload'.", source:  (0)
+[0414/132832.924:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'window-management'.", source:  (0)
+[0414/132832.939:ERROR:entry_impl.cc(1072)] No file for 80000003
+[0414/132832.939:ERROR:entry_impl.cc(1072)] No file for 80000004
+[0414/132832.941:ERROR:entry_impl.cc(1072)] No file for 80000007
+[0414/132832.941:ERROR:entry_impl.cc(1072)] No file for 80000009
+[0414/132832.941:ERROR:entry_impl.cc(1072)] No file for 80000006
+[0414/132832.941:ERROR:entry_impl.cc(1072)] No file for 80000005
+[0414/132832.942:ERROR:entry_impl.cc(1072)] No file for 80000008
+[0414/132833.153:ERROR:entry_impl.cc(1072)] No file for 8000000a
+[0414/132833.153:ERROR:entry_impl.cc(1072)] No file for 8000000b
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 8000000c
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 8000000d
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 8000000e
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 8000000f
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 80000010
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 80000011
+[0414/132833.154:ERROR:entry_impl.cc(1072)] No file for 80000015
+[0414/132833.292:ERROR:backend_impl.cc(754)] Unable to create file: -4
+[0414/132833.292:ERROR:entry_impl.cc(995)] Failed to save user data
+[0414/132833.391:ERROR:backend_impl.cc(754)] Unable to create file: -4
+[0414/132833.391:ERROR:entry_impl.cc(995)] Failed to save user data
+[0414/132833.392:ERROR:backend_impl.cc(754)] Unable to create file: -4
+[0414/132833.392:ERROR:entry_impl.cc(995)] Failed to save user data

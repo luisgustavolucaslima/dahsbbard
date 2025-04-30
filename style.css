@@ -1,0 +1,155 @@
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+h1 {
+  text-align: center;
+  padding: 1rem;
+  color: white;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+}
+
+#themeToggle {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  cursor: pointer;
+  z-index: 100;
+}
+
+.board {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  justify-content: center;
+}
+
+@media (max-width: 600px) {
+  .board { flex-direction: column; }
+}
+
+.column {
+  flex: 1;
+  min-width: 280px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  padding: 1rem;
+  transition: transform 0.3s;
+}
+
+.column:hover { transform: translateY(-5px); }
+
+.lista {
+  margin-top: 10px;
+}
+
+.pedido {
+  background: rgba(255,255,255,0.85);
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pedido.finalizado {
+  color:#fff;
+  background: rgba(255,0,0,0.1);
+  border-color: #28a745;
+}
+
+.pedido.autorizado {
+  color:#fff;
+  background: rgba(255,0,0,0.1);
+  border-color: #28a745;
+}
+
+.pedido.recusado {
+  color:#fff;
+  background: rgba(255,0,0,0.1);
+  border-color: #ff0202;
+}
+
+.pedido.invalido {
+  background: rgba(255,0,0,0.1);
+  border-color: #dc3545;
+}
+
+.pedido button {
+  background: #2a84e9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.pedido button:hover {
+  background: #1e6bb8;
+}
+
+
+#resumo {
+  background: rgba(255, 255, 255, 0.85);
+  padding: 10px 15px;
+  border-radius: 10px;
+  font-weight: bold;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  transition: background 0.3s, color 0.3s;
+}
+
+:root[data-theme="light"] body {
+  background: url('/img/background.png') no-repeat center center fixed;
+  background-size: cover;
+  color: #000;
+}
+
+:root[data-theme="dark"] body {
+  background: url('/img/backgrounddark.png') no-repeat center center fixed;
+  background-size: cover;
+  color: #fff;
+}
+
+:root[data-theme="dark"] #resumo {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+
+.pedido.invalido {
+  background: rgba(255, 0, 0, 0.1);
+  border: 2px solid #d2fc16;
+  color: #ffffff;
+}
+
+.pedido.autorizzado {
+  background: rgba(40, 167, 69, 0.1); /* verde claro */
+  border: 2px solid #28a745;
+  color: #ffffff;
+}
+
+.pedido.recusado {
+  background: rgba(255, 165, 0, 0.1); /* laranja claro */
+  border: 2px solid #ff9800;
+  color: #ff0000;
+}
+

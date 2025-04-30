@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel de Produção</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .login-box {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      width: 300px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #4caf50;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #43a047;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>🔐 Acesso ao Painel</h2>
+    <button onclick="acessarPainel()">Acessar Painel</button>
+  </div>
+
+  <script>
+    async function acessarPainel() {
+      const usuario = localStorage.getItem('usuario');
+      const permissao = localStorage.getItem('permissao');
+
+      // Verifica se o usuário está autenticado
+      if (!usuario || !permissao) {
+        alert('Usuário ou permissão inválidos. Redirecionando para login.');
+        window.location.href = 'login.html'; // Redireciona para login se não autenticado
+        return;
+      }
+
+      // Redireciona o usuário para a página correta com base na permissão
+      if (permissao === 'almoxarifado') {
+        window.location.href = 'almoxarifado.html'; // Redireciona para o painel do almoxarifado
+      } else if (permissao === 'admin') {
+        window.location.href = 'admin/index.html'; // Redireciona para o painel admin
+      } else {
+        alert('Permissão inválida. Redirecionando para login.');
+        window.location.href = 'login.html'; // Caso a permissão não seja válida
+      }
+    }
+  </script>
+</body>
+</html>

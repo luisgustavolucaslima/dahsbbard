@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="css/main.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+</head>
+<body>
+<div id="app">
+  <nav id="navbar-main" class="navbar is-fixed-top">
+    <div class="navbar-brand">
+      <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+        <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+      </a>
+    </div>
+    <div class="navbar-brand is-right">
+      <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+        <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+      </a>
+    </div>
+    <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown has-dropdown-with-icons has-divider is-hoverable">
+          <a class="navbar-link is-arrowless">
+            <span class="icon"><i class="mdi mdi-menu"></i></span>
+            <span>Menu</span>
+            <span class="icon"><i class="mdi mdi-chevron-down"></i></span>
+          </a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item"><span class="icon"><i class="mdi mdi-settings"></i></span><span>Settings</span></a>
+            <a class="navbar-item"><span class="icon"><i class="mdi mdi-email"></i></span><span>Messages</span></a>
+            <hr class="navbar-divider">
+            <a class="navbar-item"><span class="icon"><i class="mdi mdi-logout"></i></span><span>Log Out</span></a>
+          </div>
+        </div>
+        <a title="Log out" class="navbar-item is-desktop-icon-only">
+          <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+  <aside class="aside is-placed-left is-expanded">
+    <div class="aside-tools">
+      <div class="aside-tools-label">
+        <span><b>Admin</b></span>
+      </div>
+    </div>
+    <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="has-icon is-active"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+      <ul class="menu-list">
+        <li><a href="producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+        <li>
+          <a class="has-icon has-dropdown-icon">
+            <span class="icon"><i class="mdi mdi-view-list"></i></span><span class="menu-item-label">Entregas</span>
+            <div class="dropdown-icon"><span class="icon"><i class="mdi mdi-plus"></i></span></div>
+          </a>
+          <ul>
+            <li><a href="#void"><span>Sub-item One</span></a></li>
+            <li><a href="#void"><span>Sub-item Two</span></a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </aside>
+  <section class="section is-title-bar">
+    <div class="level">
+      <div class="level-left">
+        <div class="level-item">
+          <ul><li>Admin</li><li>Dashboard</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="hero is-hero-bar">
+    <div class="hero-body">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item"><h1 class="title">Dashboard</h1></div>
+        </div>
+        <div class="level-right">
+          <div class="level-item">
+            <button id="refreshDashboardBtn" class="button is-primary">Atualizar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="section is-main-section">
+    <div class="tile is-ancestor">
+      <div class="tile is-parent">
+        <div class="card tile is-child">
+          <div class="card-content">
+            <div class="level is-mobile">
+              <div class="level-item">
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Total Vendas</h3>
+                  <h1 class="title" id="totalVendas">0</h1>
+                </div>
+              </div>
+              <div class="level-item has-widget-icon">
+                <div class="is-widget-icon"><span class="icon has-text-primary is-large"><i class="mdi mdi-cart-outline mdi-48px"></i></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tile is-parent">
+        <div class="card tile is-child">
+          <div class="card-content">
+            <div class="level is-mobile">
+              <div class="level-item">
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Receita Total</h3>
+                  <h1 class="title" id="totalReceita">R$ 0,00</h1>
+                </div>
+              </div>
+              <div class="level-item has-widget-icon">
+                <div class="is-widget-icon"><span class="icon has-text-info is-large"><i class="mdi mdi-currency-usd mdi-48px"></i></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tile is-parent">
+        <div class="card tile is-child">
+          <div class="card-content">
+            <div class="level is-mobile">
+              <div class="level-item">
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Itens em Baixo Estoque</h3>
+                  <h1 class="title" id="baixoEstoque">0</h1>
+                </div>
+              </div>
+              <div class="level-item has-widget-icon">
+                <div class="is-widget-icon"><span class="icon has-text-danger is-large"><i class="mdi mdi-alert-circle-outline mdi-48px"></i></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tile is-parent">
+        <div class="card tile is-child">
+          <div class="card-content">
+            <div class="level is-mobile">
+              <div class="level-item">
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Valor Médio por Pedido</h3>
+                  <h1 class="title" id="valorMedio">R$ 0,00</h1>
+                </div>
+              </div>
+              <div class="level-item has-widget-icon">
+                <div class="is-widget-icon"><span class="icon has-text-success is-large"><i class="mdi mdi-chart-line mdi-48px"></i></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <header class="card-header">
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-finance"></i></span>Vendas Diárias</p>
+        <a href="#" class="card-header-icon"><span class="icon"><i class="mdi mdi-reload"></i></span></a>
+      </header>
+      <div class="card-content">
+        <div class="chart-area">
+          <canvas id="salesChart" height="400"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <header class="card-header">
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-cart-outline"></i></span>Top Produtos Vendidos</p>
+        <a href="#" class="card-header-icon"><span class="icon"><i class="mdi mdi-reload"></i></span></a>
+      </header>
+      <div class="card-content">
+        <div class="chart-area">
+          <canvas id="productsChart" height="400"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="card has-table">
+      <header class="card-header">
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-account-multiple"></i></span>Top Compradores</p>
+        <a href="#" class="card-header-icon"><span class="icon"><i class="mdi mdi-reload"></i></span></a>
+      </header>
+      <div class="card-content">
+        <div class="table-container">
+          <table class="table is-striped is-hoverable">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Total Gasto</th>
+                <th>Nº de Compras</th>
+                <th>Última Compra</th>
+              </tr>
+            </thead>
+            <tbody id="topBuyersTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="card has-table">
+      <header class="card-header">
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-package-variant"></i></span>Top Produtos Vendidos</p>
+        <a href="#" class="card-header-icon"><span class="icon"><i class="mdi mdi-reload"></i></span></a>
+      </header>
+      <div class="card-content">
+        <div class="table-container">
+          <table class="table is-striped is-hoverable">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Categoria</th>
+                <th>Quantidade Vendida</th>
+                <th>Receita Total</th>
+              </tr>
+            </thead>
+            <tbody id="topProductsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+  <footer class="footer">
+    <div class="container-fluid">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item">© 2025, M</div>
+          <div class="level-item">
+            <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+          </div>
+        </div>
+        <div class="level-right"><div class="level-item"></div></div>
+      </div>
+    </div>
+  </footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"></script>
+<script>
+  // Logout
+  document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+    localStorage.removeItem('usuario');
+    localStorage.removeItem('permissao');
+    window.location.href = 'login.html';
+  });
+
+  // Função para formatar moeda
+  function formatarMoeda(valor) {
+    return `R$ ${parseFloat(valor).toFixed(2).replace('.', ',')}`;
+  }
+
+  // Função para formatar data
+  function formatarData(data) {
+    return new Date(data).toLocaleDateString('pt-BR');
+  }
+
+  // Função para formatar número do cliente
+  function formatarCliente(numero) {
+      return numero.replace('@c.us', '');
+    }
+
+  // Função para atualizar o dashboard
+  async function atualizarDashboard() {
+    try {
+      const response = await fetch('/api/dashboard');
+      if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+      const data = await response.json();
+
+      // Atualizar widgets
+      document.getElementById('totalVendas').textContent = data.totalVendas;
+      document.getElementById('totalReceita').textContent = formatarMoeda(data.totalReceita);
+      document.getElementById('baixoEstoque').textContent = data.baixoEstoque;
+      document.getElementById('valorMedio').textContent = formatarMoeda(data.valorMedio);
+
+      // Atualizar tabela de top compradores
+      const topBuyersTable = document.getElementById('topBuyersTable');
+      topBuyersTable.innerHTML = '';
+      data.topCompradores.forEach(comprador => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${formatarCliente(comprador.cliente_numero)}</td>
+          <td>${formatarMoeda(comprador.valor_total)}</td>
+          <td>${comprador.total_compras}</td>
+          <td>${formatarData(comprador.ultima_compra)}</td>
+        `;
+        topBuyersTable.appendChild(row);
+      });
+
+      // Atualizar tabela de top produtos
+      const topProductsTable = document.getElementById('topProductsTable');
+      topProductsTable.innerHTML = '';
+      data.topProdutos.forEach(produto => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${produto.nome}</td>
+          <td>${produto.categoria}</td>
+          <td>${produto.quantidade_vendida}</td>
+          <td>${formatarMoeda(produto.receita_total)}</td>
+        `;
+        topProductsTable.appendChild(row);
+      });
+
+      // Atualizar gráfico de vendas diárias
+      const salesChart = new Chart(document.getElementById('salesChart'), {
+        type: 'line',
+        data: {
+          labels: data.vendasDiarias.map(d => formatarData(d.data)),
+          datasets: [{
+            label: 'Receita Diária',
+            data: data.vendasDiarias.map(d => d.receita),
+            borderColor: '#3273dc',
+            backgroundColor: 'rgba(50, 115, 220, 0.1)',
+            pointBackgroundColor: '#3273dc',
+            pointBorderColor: '#fff',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                font: { size: 14 }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `Receita: ${formatarMoeda(context.raw)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Receita (R$)',
+                font: { size: 14 }
+              },
+              grid: {
+                display: true,
+                color: 'rgba(0, 0, 0, 0.1)'
+              },
+              ticks: {
+                callback: function(value) {
+                  return formatarMoeda(value);
+                }
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Data',
+                font: { size: 14 }
+              },
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+
+      // Atualizar gráfico de top produtos
+      const productsChart = new Chart(document.getElementById('productsChart'), {
+        type: 'bar',
+        data: {
+          labels: data.topProdutos.map(p => p.nome),
+          datasets: [{
+            label: 'Quantidade Vendida',
+            data: data.topProdutos.map(p => p.quantidade_vendida),
+            backgroundColor: [
+              '#3273dc',
+              '#ffdd57',
+              '#23d160',
+              '#ff3860',
+              '#7d2ae8'
+            ],
+            borderColor: [
+              '#1f5189',
+              '#b89d2a',
+              '#1a8e3e',
+              '#b32442',
+              '#551b9e'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                font: { size: 14 }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `Quantidade: ${context.raw}`;
+                }
+              }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'top',
+              formatter: (value) => value,
+              font: {
+                weight: 'bold',
+                size: 12
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Quantidade',
+                font: { size: 14 }
+              },
+              grid: {
+                display: true,
+                color: 'rgba(0, 0, 0, 0.1)'
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Produto',
+                font: { size: 14 }
+              },
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              },
+              grid: {
+                display: false
+              }
+            }
+          }
+        },
+        plugins: [{
+          id: 'datalabels',
+          afterDatasetsDraw(chart) {
+            const { ctx, chartArea: { top, bottom, left, right } } = chart;
+            ctx.save();
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+              const meta = chart.getDatasetMeta(datasetIndex);
+              meta.data.forEach((bar, index) => {
+                const value = dataset.data[index];
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 12px Nunito';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(value, bar.x, bar.y - 5);
+              });
+            });
+            ctx.restore();
+          }
+        }]
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar dashboard:', error);
+      alert('Erro ao carregar dashboard: ' + error.message);
+    }
+  }
+
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', () => {
+    atualizarDashboard();
+    document.getElementById('refreshDashboardBtn').addEventListener('click', atualizarDashboard);
+  });
+</script>
+<style>
+  .table-container {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .table {
+    width: 100%;
+    table-layout: auto;
+  }
+  .table th, .table td {
+    white-space: nowrap;
+    padding: 0.5rem;
+  }
+  .card-content {
+    padding: 1.5rem;
+  }
+  .chart-area {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+  }
+</style>
+</body>
+</html>

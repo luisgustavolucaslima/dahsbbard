@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estoque</title>
+  <link rel="stylesheet" href="css/main.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+</head>
+<body>
+<div id="app">
+  <nav id="navbar-main" class="navbar is-fixed-top">
+    <div class="navbar-brand">
+      <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+        <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+      </a>
+    </div>
+    <div class="navbar-brand is-right">
+      <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+        <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+      </a>
+    </div>
+    <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown has-dropdown-with-icons has-divider is-hoverable">
+          <a class="navbar-link is-arrowless">
+            <span class="icon"><i class="mdi mdi-menu"></i></span>
+            <span>Menu</span>
+            <span class="icon"><i class="mdi mdi-chevron-down"></i></span>
+          </a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item"><span class="icon"><i class="mdi mdi-settings"></i></span><span>Settings</span></a>
+            <a class="navbar-item"><span class="icon"><i class="mdi mdi-email"></i></span><span>Messages</span></a>
+            <hr class="navbar-divider">
+            <a class="navbar-item"><span class="icon"><i class="mdi mdi-logout"></i></span><span>Log Out</span></a>
+          </div>
+        </div>
+        <a title="Log out" class="navbar-item is-desktop-icon-only">
+          <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+  <aside class="aside is-placed-left is-expanded">
+    <div class="aside-tools">
+      <div class="aside-tools-label">
+        <span><b>Admin</b></span>
+      </div>
+    </div>
+    <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
+        <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+      <ul class="menu-list">
+        <li><a href="tables.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="forms.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+        <li>
+          <a class="has-icon has-dropdown-icon">
+            <span class="icon"><i class="mdi mdi-view-list"></i></span><span class="menu-item-label">Entregas</span>
+            <div class="dropdown-icon"><span class="icon"><i class="mdi mdi-plus"></i></span></div>
+          </a>
+          <ul>
+            <li><a href="#void"><span>Sub-item One</span></a></li>
+            <li><a href="#void"><span>Sub-item Two</span></a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </aside>
+  <section class="section is-title-bar">
+    <div class="level">
+      <div class="level-left">
+        <div class="level-item">
+          <ul><li>Admin</li><li>Estoque</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="hero is-hero-bar">
+    <div class="hero-body">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item"><h1 class="title">Estoque</h1></div>
+        </div>
+        <div class="level-right">
+          <div class="level-item">
+            <button id="addItemBtn" class="button is-success mr-2">Adicionar Item</button>
+            <button id="exportCsvBtn" class="button is-info mr-2">Exportar CSV</button>
+            <button id="refreshEstoqueBtn" class="button is-primary">Atualizar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="section is-main-section">
+    <div class="card mb-6">
+      <header class="card-header">
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-warehouse"></i></span>Inventário</p>
+      </header>
+      <div class="card-content">
+        <form id="filterEstoqueForm">
+          <div class="field is-horizontal is-spaced">
+            <div class="field-label is-normal"><label class="label">Filtros</label></div>
+            <div class="field-body">
+              <div class="field mr-4">
+                <p class="control is-expanded has-icons-left">
+                  <input class="input" type="text" id="nomeItem" placeholder="Nome do Item">
+                  <span class="icon is-small is-left"><i class="mdi mdi-package-variant"></i></span>
+                </p>
+              </div>
+              <div class="field mr-4 is-narrow">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select id="categoria">
+                      <option value="">Todas as Categorias</option>
+                      <option value="bebidas">Bebidas</option>
+                      <option value="alimentos">Alimentos</option>
+                      <option value="outros">Outros</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="field mr-4 is-narrow">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select id="estoqueBaixo">
+                      <option value="">Todos os Níveis</option>
+                      <option value="baixo">Estoque Baixo</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <div class="control">
+                  <button type="submit" class="button is-primary">Filtrar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+        <div class="table-container">
+          <table class="table is-fullwidth is-striped is-hoverable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Quantidade</th>
+                <th>Preço Unitário</th>
+                <th>Categoria</th>
+                <th>Última Atualização</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="estoqueTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Adicionar Item -->
+    <div class="modal" id="addItemModal">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Adicionar Item</p>
+          <button class="delete" aria-label="close" onclick="closeAddModal()"></button>
+        </header>
+        <section class="modal-card-body">
+          <form id="addItemForm">
+            <div class="field">
+              <label class="label">Nome</label>
+              <div class="control">
+                <input class="input" type="text" id="addNome" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Quantidade</label>
+              <div class="control">
+                <input class="input" type="number" id="addQuantidade" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Preço Unitário</label>
+              <div class="control">
+                <input class="input" type="number" id="addPreco" step="0.01" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Categoria</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="addCategoria" required>
+                    <option value="bebidas">Bebidas</option>
+                    <option value="alimentos">Alimentos</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </form>
+        </section>
+        <footer class="modal-card-foot">
+          <button class="button is-success" onclick="salvarNovoItem()">Salvar</button>
+          <button class="button" onclick="closeAddModal()">Cancelar</button>
+        </footer>
+      </div>
+    </div>
+    <!-- Modal Editar Item -->
+    <div class="modal" id="editItemModal">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Editar Item</p>
+          <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
+        </header>
+        <section class="modal-card-body">
+          <form id="editItemForm">
+            <div class="field">
+              <label class="label">ID</label>
+              <div class="control">
+                <input class="input" type="text" id="editId">
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Nome</label>
+              <div class="control">
+                <input class="input" type="text" id="editNome" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Quantidade</label>
+              <div class="control">
+                <input class="input" type="number" id="editQuantidade" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Preço Unitário</label>
+              <div class="control">
+                <input class="input" type="number" id="editPreco" step="0.01" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Categoria</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="editCategoria" required>
+                    <option value="bebidas">Bebidas</option>
+                    <option value="alimentos">Alimentos</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </form>
+        </section>
+        <footer class="modal-card-foot">
+          <button class="button is-success" onclick="salvarEdicao()">Salvar</button>
+          <button class="button is-danger" onclick="confirmarDelecao()">Deletar</button>
+          <button class="button" onclick="closeEditModal()">Cancelar</button>
+        </footer>
+      </div>
+    </div>
+  </section>
+  <script>
+    // Logout
+    document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+      localStorage.removeItem('usuario');
+      localStorage.removeItem('permissao');
+      window.location.href = '../login.html';
+    });
+
+    // Função para formatar datas
+    function formatarData(data) {
+      const d = new Date(data);
+      return d.toLocaleString('pt-BR');
+    }
+
+    // Função para buscar e atualizar o estoque
+    async function atualizarEstoque(filtros = {}) {
+      try {
+        const query = new URLSearchParams(filtros).toString();
+        const response = await fetch(`/api/estoque?${query}`);
+        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+        const itens = await response.json();
+        const tbody = document.getElementById('estoqueTable');
+        tbody.innerHTML = '';
+        itens.forEach(item => {
+          const isLowStock = item.quantidade < 10;
+          const row = document.createElement('tr');
+          row.className = isLowStock ? 'has-background-danger-light' : '';
+          row.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.nome}</td>
+            <td>${item.quantidade}</td>
+            <td>R$ ${parseFloat(item.valor_unitario).toFixed(2)}</td>
+            <td>${item.categoria}</td>
+            <td>${formatarData(item.ultima_atualizacao)}</td>
+            <td>
+              <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(item)})'>Editar</button>
+            </td>`;
+          tbody.appendChild(row);
+        });
+        if (itens.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhum item encontrado</td></tr>';
+        }
+      } catch (error) {
+        alert('Erro ao carregar estoque: ' + error.message);
+      }
+    }
+
+    // Função para abrir modal de adição
+    function abrirAddModal() {
+      document.getElementById('addItemModal').classList.add('is-active');
+    }
+
+    // Função para fechar modal de adição
+    function closeAddModal() {
+      document.getElementById('addItemModal').classList.remove('is-active');
+      document.getElementById('addItemForm').reset();
+    }
+
+    // Função para salvar novo item
+    async function salvarNovoItem() {
+      const nome = document.getElementById('addNome').value;
+      const quantidade = parseInt(document.getElementById('addQuantidade').value);
+      const preco = parseFloat(document.getElementById('addPreco').value);
+      const categoria = document.getElementById('addCategoria').value;
+
+      try {
+        const response = await fetch('/api/estoque', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, quantidade, preco, categoria })
+        });
+        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+        alert('Item adicionado com sucesso!');
+        closeAddModal();
+        atualizarEstoque();
+      } catch (error) {
+        alert('Erro ao adicionar item: ' + error.message);
+      }
+    }
+
+    // Função para abrir modal de edição
+    function abrirEditModal(item) {
+      document.getElementById('editId').value = item.id;
+      document.getElementById('editNome').value = item.nome;
+      document.getElementById('editQuantidade').value = item.quantidade;
+      document.getElementById('editPreco').value = parseFloat(item.valor_unitario).toFixed(2);
+      document.getElementById('editCategoria').value = item.categoria;
+      document.getElementById('editItemModal').classList.add('is-active');
+    }
+
+    // Função para fechar modal de edição
+    function closeEditModal() {
+      document.getElementById('editItemModal').classList.remove('is-active');
+    }
+
+    // Função para salvar edição
+    async function salvarEdicao() {
+      const id = document.getElementById('editId').value;
+      const nome = document.getElementById('editNome').value;
+      const quantidade = parseInt(document.getElementById('editQuantidade').value);
+      const preco = parseFloat(document.getElementById('editPreco').value);
+      const categoria = document.getElementById('editCategoria').value;
+
+      try {
+        const response = await fetch(`/api/estoque/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, quantidade, preco, categoria })
+        });
+        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+        alert('Item atualizado com sucesso!');
+        closeEditModal();
+        atualizarEstoque();
+      } catch (error) {
+        alert('Erro ao atualizar item: ' + error.message);
+      }
+    }
+
+    // Função para confirmar deleção
+    function confirmarDelecao() {
+      if (confirm('Tem certeza que deseja deletar este item?')) {
+        deletarItem();
+      }
+    }
+
+    // Função para deletar item
+    async function deletarItem() {
+      const id = document.getElementById('editId').value;
+      try {
+        const response = await fetch(`/api/estoque/${id}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+        alert('Item deletado com sucesso!');
+        closeEditModal();
+        atualizarEstoque();
+      } catch (error) {
+        alert('Erro ao deletar item: ' + error.message);
+      }
+    }
+
+    // Função para exportar tabela como CSV
+    function exportarCsv() {
+      const table = document.getElementById('estoqueTable');
+      let csv = [];
+      const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent).slice(0, -1); // Exclui coluna Ações
+      csv.push(headers.join(','));
+
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).slice(0, -1).map(cell => `"${cell.textContent.replace(/"/g, '""')}"`);
+        csv.push(cells.join(','));
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv.join('\n'));
+      const link = document.createElement('a');
+      link.setAttribute('href', csvContent);
+      link.setAttribute('download', `estoque_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', () => {
+      atualizarEstoque();
+
+      // Filtro de estoque
+      document.getElementById('filterEstoqueForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const filtros = {
+          nome: document.getElementById('nomeItem').value,
+          categoria: document.getElementById('categoria').value,
+          estoque_baixo: document.getElementById('estoqueBaixo').value
+        };
+        atualizarEstoque(filtros);
+      });
+
+      // Botão de atualização
+      document.getElementById('refreshEstoqueBtn').addEventListener('click', () => {
+        atualizarEstoque();
+      });
+
+      // Botão de adicionar item
+      document.getElementById('addItemBtn').addEventListener('click', abrirAddModal);
+
+      // Botão de exportar CSV
+      document.getElementById('exportCsvBtn').addEventListener('click', exportarCsv);
+    });
+  </script>
+  <style>
+    .table-container {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .table th, .table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .table th {
+      background-color: #f3f4f6;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .field.is-horizontal.is-spaced .field-body .field {
+      margin-bottom: 0.75rem;
+    }
+    .modal-card-body {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .has-background-danger-light {
+      background-color: #fff5f5;
+    }
+  </style>
+  <footer class="footer">
+    <div class="container-fluid">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item">© 2025, M</div>
+          <div class="level-item">
+            <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+          </div>
+        </div>
+        <div class="level-right"><div class="level-item"></div></div>
+      </div>
+    </div>
+  </footer>
+</div>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93848e269a23b0e7',t:'MTc0NTk5MDA2My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>
