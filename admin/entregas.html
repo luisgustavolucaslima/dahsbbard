@@ -14,118 +14,46 @@
     <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
   </head>
 <body>
-<div id="app">
-  <nav id="navbar-main" class="navbar is-fixed-top">
-    <div class="navbar-brand">
-      <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
-        <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
-      </a>
-    </div>
-    <div class="navbar-brand is-right">
-      <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
-        <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
-      </a>
-    </div>
-    <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
-      <div class="navbar-end">
-        <div class="navbar-item has-dropdown has-dropdown-with-icons has-divider is-hoverable">
-          <a class="navbar-link is-arrowless">
-            <span class="icon">
-              <i class="mdi mdi-menu"></i>
-            </span>
-            <span>Menu</span>
-            <span class="icon">
-              <i class="mdi mdi-chevron-down"></i>
-            </span>
-          </a>
-          <div class="navbar-dropdown">
-            <a class="navbar-item">
-              <span class="icon"><i class="mdi mdi-settings"></i></span>
-              <span>Settings</span>
-            </a>
-            <a class="navbar-item">
-              <span class="icon"><i class="mdi mdi-email"></i></span>
-              <span>Messages</span>
-            </a>
-            <hr class="navbar-divider">
-            <a class="navbar-item">
-              <span class="icon"><i class="mdi mdi-logout"></i></span>
-              <span>Log Out</span>
-            </a>
-          </div>
-        </div>
-        <a title="Log out" class="navbar-item is-desktop-icon-only">
-          <span class="icon"><i class="mdi mdi-logout"></i></span>
-          <span>Log out</span>
+  <div id="app">
+    <nav id="navbar-main" class="navbar is-fixed-top">
+      <div class="navbar-brand">
+        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
         </a>
       </div>
-    </div>
-  </nav>
-  <aside class="aside is-placed-left is-expanded">
-    <div class="aside-tools">
-      <div class="aside-tools-label">
-        <span><b>Admin</b></span>
+      <div class="navbar-brand is-right">
+        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+        </a>
       </div>
-    </div>
-    <div class="menu is-menu-main">
-      <p class="menu-label">Geral</p>
-      <ul class="menu-list">
-        <li>
-          <a href="index.html" class="has-icon">
-            <span class="icon"><i class="mdi mdi-desktop-mac"></i></span>
-            <span class="menu-item-label">Dashboard</span>
+      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+        <div class="navbar-end">
+          <a title="Log out" class="navbar-item is-desktop-icon-only">
+            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
           </a>
-        </li>
-        <li>
-          <a href="usuarios.html" class="has-icon">
-            <span class="icon"><i class="mdi mdi-account-circle"></i></span>
-            <span class="menu-item-label">Usuarios</span>
-          </a>
-        </li>
-        <li>
-          <a href="estoque.html" class="has-icon">
-            <span class="icon"><i class="mdi mdi-account-circle"></i></span>
-            <span class="menu-item-label">Estoques</span>
-          </a>
-        </li>
-      </ul>
-      <p class="menu-label">Logic Ice</p>
-      <ul class="menu-list">
-        <li>
-          <a href="tables.html" class="has-icon">
-            <span class="icon has-update-mark"><i class="mdi mdi-table"></i></span>
-            <span class="menu-item-label">Produção</span>
-          </a>
-        </li>
-        <li>
-          <a href="forms.html" class="is-active has-icon">
-            <span class="icon"><i class="mdi mdi-square-edit-outline"></i></span>
-            <span class="menu-item-label">Vendas</span>
-          </a>
-        </li>
-        <li>
-          <a class="has-icon has-dropdown-icon">
-            <span class="icon"><i class="mdi mdi-view-list"></i></span>
-            <span class="menu-item-label">Entregas</span>
-            <div class="dropdown-icon">
-              <span class="icon"><i class="mdi mdi-plus"></i></span>
-            </div>
-          </a>
-          <ul>
-            <li>
-              <a href="#void">
-                <span>Sub-item One</span>
-              </a>
-            </li>
-            <li>
-              <a href="#void">
-                <span>Sub-item Two</span>
-              </a>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </div>
+        </div>
+      </div>
+    </nav>
+    <aside class="aside is-placed-left is-expanded">
+      <div class="aside-tools">
+        <div class="aside-tools-label">
+          <span><b>Admin</b></span>
+        </div>
+      </div>
+      <div class="menu is-menu-main">
+        <p class="menu-label">Geral</p>
+        <ul class="menu-list">
+          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+          <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
+          <li><a href="estoque.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        </ul>
+        <p class="menu-label">Logic Ice</p>
+        <ul class="menu-list">
+          <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+          <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+          <li><a href="entregas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
+        </ul>
+      </div>
   </aside>
   <section class="section is-title-bar">
     <div class="level">
@@ -679,5 +607,10 @@
     </div>
   </footer>
 </div>
+<!-- Scripts below are for demo only -->
+<script type="text/javascript" src="js/main.min.js"></script>
+
+<!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
+<link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
 </body>
 </html>

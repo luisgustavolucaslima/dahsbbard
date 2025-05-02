@@ -228,15 +228,15 @@ app.get('/api/estoque', async (req, res) => {
 // Endpoint para adicionar item
 app.post('/api/estoque', async (req, res) => {
   try {
-    const { nome, quantidade, preco, categoria } = req.body;
+    const { nome, quantidade, medida, descricao, preco, categoria } = req.body;
 
-    if (!nome || quantidade === undefined || preco === undefined || !categoria) {
+    if (!nome || quantidade === undefined || preco === undefined || !categoria || !descricao || !medida) {
       return res.status(400).json({ erro: 'Todos os campos são obrigatórios' });
     }
 
     const [result] = await db.query(
-      'INSERT INTO estoque (nome, quantidade, valor_unitario, categoria, ultima_atualizacao = NOW()) VALUES (?, ?, ?, ?)',
-      [nome, quantidade, preco, categoria]
+      'INSERT INTO estoque (nome, quantidade, medida, info_extra, valor_unitario, categoria, ultima_atualizacao) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+      [nome, quantidade, medida, descricao, preco, categoria]
     );
 
     res.status(201).json({ id: result.insertId, mensagem: 'Item adicionado com sucesso' });
@@ -410,9 +410,7 @@ app.delete('/api/estoque/:id', async (req, res) => {
 });
 
 
-app.listen(port, () => {
-  console.log(`🟢 Servidor rodando em http://localhost:${port}`);
-});
+
 
 app.get('/entregas', async (req, res) => {
   try {
@@ -428,6 +426,66 @@ app.get('/entregas', async (req, res) => {
     res.status(500).json({ erro: 'Erro ao buscar entregas' });
   }
 });
+
+app.get('/api/categorias', async (req, res) => {
+  try {
+    const [result] = await db.query("SHOW COLUMNS FROM estoque WHERE Field = 'categoria'");
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Coluna categoria não encontrada' });
+    }
+    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+      .split(',')
+      .map(value => value.replace(/'/g, ''));
+    const categorias = enumValues.map(value => ({
+      id: value,
+      nome: value.charAt(0).toUpperCase() + value.slice(1)
+    }));
+    res.json(categorias);
+  } catch (error) {
+    console.error('Erro ao buscar valores do ENUM categoria:', error);
+    res.status(500).json({ error: 'Erro ao buscar categorias' });
+  }
+});
+
+app.post('/api/categorias', async (req, res) => {
+  try {
+    const { novaCategoria } = req.body;
+
+    if (!novaCategoria || typeof novaCategoria !== 'string' || novaCategoria.trim() === '') {
+      return res.status(400).json({ error: 'O nome da nova categoria é obrigatório e deve ser uma string válida' });
+    }
+
+    // Normaliza a categoria (remove espaços extras, converte para minúsculas)
+    const categoriaNormalizada = novaCategoria.trim().toLowerCase();
+
+    // Verifica se a categoria já existe no ENUM
+    const [result] = await db.query("SHOW COLUMNS FROM estoque WHERE Field = 'categoria'");
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Coluna categoria não encontrada' });
+    }
+
+    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+      .split(',')
+      .map(value => value.replace(/'/g, ''));
+
+    if (enumValues.includes(categoriaNormalizada)) {
+      return res.status(400).json({ error: 'Categoria já existe' });
+    }
+
+    // Adiciona a nova categoria ao ENUM
+    const novosValores = [...enumValues, categoriaNormalizada]
+      .map(value => `'${value}'`)
+      .join(',');
+
+    await db.query(`ALTER TABLE estoque MODIFY COLUMN categoria ENUM(${novosValores}) NOT NULL`);
+
+    res.status(201).json({ mensagem: 'Categoria adicionada com sucesso', categoria: categoriaNormalizada });
+  } catch (error) {
+    console.error('Erro ao adicionar categoria:', error);
+    res.status(500).json({ error: 'Erro ao adicionar categoria' });
+  }
+});
+
 
 // Novas rotas para admin.html
 app.get('/api/resumo', async (req, res) => {
@@ -553,4 +611,475 @@ app.patch('/api/vendas/:id', async (req, res) => {
     console.error('Erro ao atualizar venda:', err);
     res.status(500).json({ erro: 'Erro ao atualizar venda' });
   }
+});
+
+// Endpoint para listar todos os usuários web
+app.get('/api/usuarios_web', async (req, res) => {
+  try {
+    const [usuarios] = await db.query(`
+      SELECT id, usuario, permissao, data_criacao
+      FROM usuarios_web
+      ORDER BY usuario
+    `);
+    res.json(usuarios);
+  } catch (err) {
+    console.error('Erro ao buscar usuários web:', err);
+    res.status(500).json({ erro: 'Erro ao buscar usuários web' });
+  }
+});
+
+// Endpoint para obter um usuário web por ID
+app.get('/api/usuarios_web/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [usuarios] = await db.query(`
+      SELECT id, usuario, permissao, data_criacao
+      FROM usuarios_web
+      WHERE id = ?
+    `, [id]);
+    if (usuarios.length === 0) {
+      return res.status(404).json({ erro: 'Usuário web não encontrado' });
+    }
+    res.json(usuarios[0]);
+  } catch (err) {
+    console.error('Erro ao buscar usuário web:', err);
+    res.status(500).json({ erro: 'Erro ao buscar usuário web' });
+  }
+});
+
+// Endpoint para adicionar um usuário web
+app.post('/api/usuarios_web', async (req, res) => {
+  try {
+    const { usuario, senha, permissao } = req.body;
+
+    if (!usuario || !senha || !permissao) {
+      return res.status(400).json({ erro: 'Usuário, senha e permissão são obrigatórios' });
+    }
+
+    // Verificar se o usuário já existe
+    const [existing] = await db.query('SELECT id FROM usuarios_web WHERE usuario = ?', [usuario]);
+    if (existing.length > 0) {
+      return res.status(400).json({ erro: 'Usuário já existe' });
+    }
+
+    const [result] = await db.query(`
+      INSERT INTO usuarios_web (usuario, senha, permissao, data_criacao)
+      VALUES (?, ?, ?, NOW())
+    `, [usuario, senha, permissao]);
+
+    res.status(201).json({ id: result.insertId, mensagem: 'Usuário web adicionado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao adicionar usuário web:', err);
+    res.status(500).json({ erro: 'Erro ao adicionar usuário web' });
+  }
+});
+
+// Endpoint para listar todos os usuários
+app.get('/api/usuarios', async (req, res) => {
+  try {
+    const [usuarios] = await db.query(`
+      SELECT id, nome, numero, cargo, departamento, email, data_contratacao, salario, data_registro
+      FROM usuarios
+      ORDER BY nome
+    `);
+    res.json(usuarios);
+  } catch (err) {
+    console.error('Erro ao buscar usuários:', err);
+    res.status(500).json({ erro: 'Erro ao buscar usuários' });
+  }
+});
+
+// Endpoint para obter um usuário por ID
+app.get('/api/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [usuarios] = await db.query(`
+      SELECT id, nome, numero, cargo, departamento, email, data_contratacao, salario, data_registro
+      FROM usuarios
+      WHERE id = ?
+    `, [id]);
+    if (usuarios.length === 0) {
+      return res.status(404).json({ erro: 'Usuário não encontrado' });
+    }
+    res.json(usuarios[0]);
+  } catch (err) {
+    console.error('Erro ao buscar usuário:', err);
+    res.status(500).json({ erro: 'Erro ao buscar usuário' });
+  }
+});
+
+// Endpoint para adicionar um usuário
+app.post('/api/usuarios', async (req, res) => {
+  try {
+    const { nome, numero, cargo, departamento, email, data_contratacao, salario } = req.body;
+
+    if (!nome || !numero) {
+      return res.status(400).json({ erro: 'Nome e número são obrigatórios' });
+    }
+
+    // Verificar se o número já existe
+    const [existing] = await db.query('SELECT id FROM usuarios WHERE numero = ?', [numero]);
+    if (existing.length > 0) {
+      return res.status(400).json({ erro: 'Número já registrado' });
+    }
+
+    const [result] = await db.query(`
+      INSERT INTO usuarios (nome, numero, cargo, departamento, email, data_contratacao, salario, data_registro)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+    `, [nome, numero, cargo || null, departamento || null, email || null, data_contratacao || null, salario || null]);
+
+    res.status(201).json({ id: result.insertId, mensagem: 'Usuário adicionado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao adicionar usuário:', err);
+    res.status(500).json({ erro: 'Erro ao adicionar usuário' });
+  }
+});
+
+// Endpoint para atualizar um usuário
+app.put('/api/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, numero, cargo, departamento, email, data_contratacao, salario } = req.body;
+
+    if (!nome || !numero) {
+      return res.status(400).json({ erro: 'Nome e número são obrigatórios' });
+    }
+
+    // Verificar se o usuário existe
+    const [existing] = await db.query('SELECT id FROM usuarios WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ erro: 'Usuário não encontrado' });
+    }
+
+    // Verificar se o número já está em uso por outro usuário
+    const [duplicate] = await db.query('SELECT id FROM usuarios WHERE numero = ? AND id != ?', [numero, id]);
+    if (duplicate.length > 0) {
+      return res.status(400).json({ erro: 'Número já está em uso' });
+    }
+
+    const [result] = await db.query(`
+      UPDATE usuarios
+      SET nome = ?, numero = ?, cargo = ?, departamento = ?, email = ?, data_contratacao = ?, salario = ?
+      WHERE id = ?
+    `, [nome, numero, cargo || null, departamento || null, email || null, data_contratacao || null, salario || null, id]);
+
+    res.json({ mensagem: 'Usuário atualizado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao atualizar usuário:', err);
+    res.status(500).json({ erro: 'Erro ao atualizar usuário' });
+  }
+});
+
+// Endpoint para listar todas as despesas
+app.get('/api/despesas', async (req, res) => {
+  try {
+    const { descricao, categoria, tipo } = req.query;
+    let query = `
+      SELECT id, nome, descricao, valor, categoria, data_despesa, tipo, data_criacao
+      FROM despesas
+    `;
+    const params = [];
+    const conditions = [];
+    if (descricao) {
+      conditions.push('descricao LIKE ?');
+      params.push(`%${descricao}%`);
+    }
+    if (categoria) {
+      conditions.push('categoria = ?');
+      params.push(categoria);
+    }
+    if (tipo) {
+      conditions.push('tipo = ?');
+      params.push(tipo);
+    }
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    query += ' ORDER BY data_despesa DESC';
+    const [despesas] = await db.query(query, params);
+    // Formatar categoria para exibição
+    const formattedDespesas = despesas.map(despesa => ({
+      ...despesa,
+      categoria_nome: despesa.categoria ? despesa.categoria.charAt(0).toUpperCase() + despesa.categoria.slice(1) : 'Sem categoria'
+    }));
+    res.json(formattedDespesas);
+  } catch (err) {
+    console.error('Erro ao buscar despesas:', err);
+    res.status(500).json({ erro: 'Erro ao buscar despesas' });
+  }
+});
+
+// Endpoint para obter uma despesa por ID
+app.get('/api/despesas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [despesas] = await db.query(`
+      SELECT id, nome, descricao, valor, categoria, data_despesa, tipo, data_criacao
+      FROM despesas
+      WHERE id = ?
+    `, [id]);
+    if (despesas.length === 0) {
+      return res.status(404).json({ erro: 'Despesa não encontrada' });
+    }
+    const despesa = despesas[0];
+    res.json({
+      ...despesa,
+      categoria_nome: despesa.categoria ? despesa.categoria.charAt(0).toUpperCase() + despesa.categoria.slice(1) : 'Sem categoria'
+    });
+  } catch (err) {
+    console.error('Erro ao buscar despesa:', err);
+    res.status(500).json({ erro: 'Erro ao buscar despesa' });
+  }
+});
+
+// Endpoint para adicionar uma despesa
+app.post('/api/despesas', async (req, res) => {
+  try {
+    const { nome, descricao, valor, categoria, data_despesa, tipo } = req.body;
+    if (!descricao || !valor || !categoria || !data_despesa || !tipo) {
+      return res.status(400).json({ erro: 'Os campos descrição, valor, categoria, data da despesa e tipo são obrigatórios' });
+    }
+    if (valor <= 0) {
+      return res.status(400).json({ erro: 'O valor deve ser positivo' });
+    }
+    if (!['fixa', 'variavel'].includes(tipo)) {
+      return res.status(400).json({ erro: 'Tipo inválido. Use "fixa" ou "variavel"' });
+    }
+    // Validar categoria contra o ENUM
+    const [result] = await db.query("SHOW COLUMNS FROM despesas WHERE Field = 'categoria'");
+    if (result.length === 0) {
+      return res.status(500).json({ erro: 'Coluna categoria não encontrada' });
+    }
+    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+      .split(',')
+      .map(value => value.replace(/'/g, ''));
+    if (!enumValues.includes(categoria)) {
+      return res.status(400).json({ erro: `Categoria inválida. Valores permitidos: ${enumValues.join(', ')}` });
+    }
+    // Validar data_despesa (não pode ser futura)
+    const today = new Date().toISOString().split('T')[0];
+    if (data_despesa > today) {
+      return res.status(400).json({ erro: 'Data da despesa não pode ser futura' });
+    }
+    const [insertResult] = await db.query(`
+      INSERT INTO despesas (nome, descricao, valor, categoria, data_despesa, tipo, data_criacao)
+      VALUES (?, ?, ?, ?, ?, ?, NOW())
+    `, [nome || null, descricao, valor, categoria, data_despesa, tipo]);
+    res.status(201).json({ id: insertResult.insertId, mensagem: 'Despesa adicionada com sucesso' });
+  } catch (err) {
+    console.error('Erro ao adicionar despesa:', err);
+    res.status(500).json({ erro: 'Erro ao adicionar despesa' });
+  }
+});
+
+// Endpoint para atualizar uma despesa
+app.put('/api/despesas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, descricao, valor, categoria, data_despesa, tipo } = req.body;
+    if (!descricao || !valor || !categoria || !data_despesa || !tipo) {
+      return res.status(400).json({ erro: 'Os campos descrição, valor, categoria, data da despesa e tipo são obrigatórios' });
+    }
+    if (valor <= 0) {
+      return res.status(400).json({ erro: 'O valor deve ser positivo' });
+    }
+    if (!['fixa', 'variavel'].includes(tipo)) {
+      return res.status(400).json({ erro: 'Tipo inválido. Use "fixa" ou "variavel"' });
+    }
+    // Validar categoria contra o ENUM
+    const [result] = await db.query("SHOW COLUMNS FROM despesas WHERE Field = 'categoria'");
+    if (result.length === 0) {
+      return res.status(500).json({ erro: 'Coluna categoria não encontrada' });
+    }
+    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+      .split(',')
+      .map(value => value.replace(/'/g, ''));
+    if (!enumValues.includes(categoria)) {
+      return res.status(400).json({ erro: `Categoria inválida. Valores permitidos: ${enumValues.join(', ')}` });
+    }
+    // Validar data_despesa (não pode ser futura)
+    const today = new Date().toISOString().split('T')[0];
+    if (data_despesa > today) {
+      return res.status(400).json({ erro: 'Data da despesa não pode ser futura' });
+    }
+    // Verificar se a despesa existe
+    const [existing] = await db.query('SELECT id FROM despesas WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ erro: 'Despesa não encontrada' });
+    }
+    const [updateResult] = await db.query(`
+      UPDATE despesas
+      SET nome = ?, descricao = ?, valor = ?, categoria = ?, data_despesa = ?, tipo = ?
+      WHERE id = ?
+    `, [nome || null, descricao, valor, categoria, data_despesa, tipo, id]);
+    res.json({ mensagem: 'Despesa atualizada com sucesso' });
+  } catch (err) {
+    console.error('Erro ao atualizar despesa:', err);
+    res.status(500).json({ erro: 'Erro ao atualizar despesa' });
+  }
+});
+
+// Endpoint para deletar uma despesa
+app.delete('/api/despesas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [existing] = await db.query('SELECT id FROM despesas WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ erro: 'Despesa não encontrada' });
+    }
+    const [result] = await db.query('DELETE FROM despesas WHERE id = ?', [id]);
+    res.json({ mensagem: 'Despesa deletada com sucesso' });
+  } catch (err) {
+    console.error('Erro ao deletar despesa:', err);
+    res.status(500).json({ erro: 'Erro ao deletar despesa' });
+  }
+});
+
+// Endpoint para listar categorias
+app.get('/api/categorias/despesas', async (req, res) => {
+  try {
+    const [result] = await db.query("SHOW COLUMNS FROM despesas WHERE Field = 'categoria'");
+    if (result.length === 0) {
+      return res.status(500).json({ erro: 'Coluna categoria não encontrada' });
+    }
+    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+      .split(',')
+      .map(value => value.replace(/'/g, ''))
+      .filter(value => value !== ''); // Remove valores vazios
+    const categorias = enumValues.map(value => ({
+      id: value,
+      nome: value.charAt(0).toUpperCase() + value.slice(1)
+    }));
+    res.json(categorias);
+  } catch (err) {
+    console.error('Erro ao listar categorias:', err);
+    res.status(500).json({ erro: 'Erro ao listar categorias' });
+  }
+});
+
+// Endpoint para adicionar uma nova categoria ao ENUM
+app.post('/api/despesas/categorias/adicionar', async (req, res) => {
+  try {
+    const { novaCategoria } = req.body;
+    if (!novaCategoria || typeof novaCategoria !== 'string' || novaCategoria.trim() === '') {
+      return res.status(400).json({ erro: 'O nome da nova categoria é obrigatório e deve ser uma string válida' });
+    }
+    // Normaliza a categoria (remove espaços extras, converte para minúsculas, substitui espaços por underscores)
+    const categoriaNormalizada = novaCategoria.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!/^[a-z_]{1,50}$/.test(categoriaNormalizada)) {
+      return res.status(400).json({ erro: 'O nome da categoria deve conter apenas letras e underscores, até 50 caracteres' });
+    }
+    // Verifica se a categoria já existe no ENUM
+    const [result] = await db.query("SHOW COLUMNS FROM despesas WHERE Field = 'categoria'");
+    if (result.length === 0) {
+      return res.status(404).json({ erro: 'Coluna categoria não encontrada' });
+    }
+    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+      .split(',')
+      .map(value => value.replace(/'/g, ''))
+      .filter(value => value !== '');
+    if (enumValues.includes(categoriaNormalizada)) {
+      return res.status(400).json({ erro: 'Categoria já existe' });
+    }
+    // Adiciona a nova categoria ao ENUM
+    const novosValores = [...enumValues, categoriaNormalizada];
+    const novosValoresStr = novosValores.map(value => `'${value}'`).join(',');
+    await db.query(`ALTER TABLE despesas MODIFY COLUMN categoria ENUM(${novosValoresStr}) NOT NULL`);
+    res.status(201).json({ mensagem: 'Categoria adicionada com sucesso', categoria: categoriaNormalizada });
+  } catch (error) {
+    console.error('Erro ao adicionar categoria:', error);
+    res.status(500).json({ erro: 'Erro ao adicionar categoria' });
+  }
+});
+
+app.get('/api/despesas/relatorio', async (req, res) => {
+  try {
+    const [relatorio] = await db.query(`
+      SELECT DATE_FORMAT(data_despesa, '%Y-%m') AS mes, SUM(valor) AS total
+      FROM despesas
+      GROUP BY mes
+      ORDER BY mes DESC
+    `);
+    res.json(relatorio);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao gerar relatório' });
+  }
+});
+
+// Endpoint para deletar um usuário
+app.delete('/api/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db.query('SELECT id FROM usuarios WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ erro: 'Usuário não encontrado' });
+    }
+
+    const [result] = await db.query('DELETE FROM usuarios WHERE id = ?', [id]);
+
+    res.json({ mensagem: 'Usuário deletado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao deletar usuário:', err);
+    res.status(500).json({ erro: 'Erro ao deletar usuário' });
+  }
+});
+
+// Endpoint para atualizar um usuário web
+app.put('/api/usuarios_web/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { usuario, senha, permissao } = req.body;
+
+    if (!usuario || !senha || !permissao) {
+      return res.status(400).json({ erro: 'Usuário, senha e permissão são obrigatórios' });
+    }
+
+    // Verificar se o usuário existe
+    const [existing] = await db.query('SELECT id FROM usuarios_web WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ erro: 'Usuário web não encontrado' });
+    }
+
+    // Verificar se o novo nome de usuário já está em uso por outro registro
+    const [duplicate] = await db.query('SELECT id FROM usuarios_web WHERE usuario = ? AND id != ?', [usuario, id]);
+    if (duplicate.length > 0) {
+      return res.status(400).json({ erro: 'Novo nome de usuário já está em uso' });
+    }
+
+    const [result] = await db.query(`
+      UPDATE usuarios_web
+      SET usuario = ?, senha = ?, permissao = ?
+      WHERE id = ?
+    `, [usuario, senha, permissao, id]);
+
+    res.json({ mensagem: 'Usuário web atualizado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao atualizar usuário web:', err);
+    res.status(500).json({ erro: 'Erro ao atualizar usuário web' });
+  }
+});
+
+// Endpoint para deletar um usuário web
+app.delete('/api/usuarios_web/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db.query('SELECT id FROM usuarios_web WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ erro: 'Usuário web não encontrado' });
+    }
+
+    const [result] = await db.query('DELETE FROM usuarios_web WHERE id = ?', [id]);
+
+    res.json({ mensagem: 'Usuário web deletado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao deletar usuário web:', err);
+    res.status(500).json({ erro: 'Erro ao deletar usuário web' });
+  }
+});
+
+
+app.listen(port, () => {
+  console.log(`🟢 Servidor rodando em http://localhost:${port}`);
 });

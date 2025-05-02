@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+<html lang="pt-BR" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Estoque</title>
+  <title>Despesas</title>
   <link rel="stylesheet" href="css/main.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+  <!-- Toastify CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 </head>
 <body>
 <div id="app">
@@ -41,8 +44,9 @@
       <p class="menu-label">Geral</p>
       <ul class="menu-list">
         <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
-        <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuários</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="despesas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
       </ul>
       <p class="menu-label">Logic Ice</p>
       <ul class="menu-list">
@@ -56,7 +60,7 @@
     <div class="level">
       <div class="level-left">
         <div class="level-item">
-          <ul><li>Admin</li><li>Estoque</li></ul>
+          <ul><li>Admin</li><li>Despesas</li></ul>
         </div>
       </div>
     </div>
@@ -65,13 +69,13 @@
     <div class="hero-body">
       <div class="level">
         <div class="level-left">
-          <div class="level-item"><h1 class="title">Estoque</h1></div>
+          <div class="level-item"><h1 class="title">Despesas</h1></div>
         </div>
         <div class="level-right">
           <div class="level-item">
-            <button id="addItemBtn" class="button is-success mr-2">Adicionar Item</button>
+            <button id="addDespesaBtn" class="button is-success mr-2">Adicionar Despesa</button>
             <button id="exportCsvBtn" class="button is-info mr-2">Exportar CSV</button>
-            <button id="refreshEstoqueBtn" class="button is-primary">Atualizar</button>
+            <button id="refreshDespesasBtn" class="button is-primary">Atualizar</button>
           </div>
         </div>
       </div>
@@ -80,17 +84,17 @@
   <section class="section is-main-section">
     <div class="card mb-6">
       <header class="card-header">
-        <p class="card-header-title"><span class="icon"><i class="mdi mdi-warehouse"></i></span>Inventário</p>
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-currency-brl"></i></span>Registro de Despesas</p>
       </header>
       <div class="card-content">
-        <form id="filterEstoqueForm">
+        <form id="filterDespesasForm">
           <div class="field is-horizontal is-spaced">
             <div class="field-label is-normal"><label class="label">Filtros</label></div>
             <div class="field-body">
               <div class="field mr-4">
                 <p class="control is-expanded has-icons-left">
-                  <input class="input" type="text" id="nomeItem" placeholder="Nome do Item">
-                  <span class="icon is-small is-left"><i class="mdi mdi-package-variant"></i></span>
+                  <input class="input" type="text" id="descricao" placeholder="Descrição da Despesa">
+                  <span class="icon is-small is-left"><i class="mdi mdi-text"></i></span>
                 </p>
               </div>
               <div class="field mr-4 is-narrow">
@@ -105,9 +109,10 @@
               <div class="field mr-4 is-narrow">
                 <div class="control">
                   <div class="select is-fullwidth">
-                    <select id="estoqueBaixo">
-                      <option value="">Todos os Níveis</option>
-                      <option value="baixo">Estoque Baixo</option>
+                    <select id="tipo">
+                      <option value="">Todos os Tipos</option>
+                      <option value="fixa">Fixa</option>
+                      <option value="variavel">Variável</option>
                     </select>
                   </div>
                 </div>
@@ -126,7 +131,7 @@
             <div class="field-body">
               <div class="field mr-4">
                 <p class="control is-expanded">
-                  <input class="input" type="text" id="novaCategoria" placeholder="Nome da nova categoria" required>
+                  <input class="input" type="text" id="novaCategoria" placeholder="Nome da nova categoria" required maxlength="50">
                 </p>
               </div>
               <div class="field">
@@ -142,51 +147,40 @@
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Nome</th>
-                <th>Quantidade</th>
-                <th>Preço Unitário</th>
+                <th>Descrição</th>
+                <th>Valor</th>
                 <th>Categoria</th>
-                <th>Última Atualização</th>
+                <th>Data da Despesa</th>
+                <th>Tipo</th>
+                <th>Data de Criação</th>
                 <th>Ações</th>
               </tr>
             </thead>
-            <tbody id="estoqueTable"></tbody>
+            <tbody id="despesasTable"></tbody>
           </table>
         </div>
       </div>
     </div>
-    <!-- Modal Adicionar Item -->
-    <div class="modal" id="addItemModal">
+    <!-- Modal Adicionar Despesa -->
+    <div class="modal" id="addDespesaModal">
       <div class="modal-background"></div>
       <div class="modal-card">
         <header class="modal-card-head">
-          <p class="modal-card-title">Adicionar Item</p>
+          <p class="modal-card-title">Adicionar Despesa</p>
           <button class="delete" aria-label="close" onclick="closeAddModal()"></button>
         </header>
         <section class="modal-card-body">
-          <form id="addItemForm">
+          <form id="addDespesaForm">
             <div class="field">
-              <label class="label">Nome</label>
+              <label class="label">Descrição</label>
               <div class="control">
-                <input class="input" type="text" id="addNome" required>
+                <input class="input" type="text" id="addDescricao" required minlength="3" maxlength="255">
               </div>
             </div>
             <div class="field">
-              <label class="label">Quantidade</label>
+              <label class="label">Valor (R$)</label>
               <div class="control">
-                <input class="input" type="number" id="addQuantidade" min="0" required>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Medida</label>
-              <div class="control">
-                <input class="input" type="text" id="addMedida" min="0" required>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Preço Unitário</label>
-              <div class="control">
-                <input class="input" type="number" id="addPreco" step="0.01" min="0" required>
+                <input class="input" type="number" id="addValor" step="0.01" min="0.01" required>
               </div>
             </div>
             <div class="field">
@@ -200,29 +194,40 @@
               </div>
             </div>
             <div class="field">
-              <label class="label">Decrição</label>
+              <label class="label">Data da Despesa</label>
               <div class="control">
-                <input class="input" type="text" id="addDescricao" required>
+                <input class="input" type="date" id="addDataDespesa" required max="2025-05-01">
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Tipo</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="addTipo" required>
+                    <option value="variavel">Variável</option>
+                    <option value="fixa">Fixa</option>
+                  </select>
+                </div>
               </div>
             </div>
           </form>
         </section>
         <footer class="modal-card-foot">
-          <button class="button is-success" onclick="salvarNovoItem()">Salvar</button>
+          <button class="button is-success" onclick="salvarNovaDespesa()">Salvar</button>
           <button class="button" onclick="closeAddModal()">Cancelar</button>
         </footer>
       </div>
     </div>
-    <!-- Modal Editar Item -->
-    <div class="modal" id="editItemModal">
+    <!-- Modal Editar Despesa -->
+    <div class="modal" id="editDespesaModal">
       <div class="modal-background"></div>
       <div class="modal-card">
         <header class="modal-card-head">
-          <p class="modal-card-title">Editar Item</p>
+          <p class="modal-card-title">Editar Despesa</p>
           <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
         </header>
         <section class="modal-card-body">
-          <form id="editItemForm">
+          <form id="editDespesaForm">
             <div class="field">
               <label class="label">ID</label>
               <div class="control">
@@ -230,21 +235,15 @@
               </div>
             </div>
             <div class="field">
-              <label class="label">Nome</label>
+              <label class="label">Descrição</label>
               <div class="control">
-                <input class="input" type="text" id="editNome" required>
+                <input class="input" type="text" id="editDescricao" required minlength="3" maxlength="255">
               </div>
             </div>
             <div class="field">
-              <label class="label">Quantidade</label>
+              <label class="label">Valor (R$)</label>
               <div class="control">
-                <input class="input" type="number" id="editQuantidade" min="0" required>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Preço Unitário</label>
-              <div class="control">
-                <input class="input" type="number" id="editPreco" step="0.01" min="0" required>
+                <input class="input" type="number" id="editValor" step="0.01" min="0.01" required>
               </div>
             </div>
             <div class="field">
@@ -253,6 +252,23 @@
                 <div class="select is-fullwidth">
                   <select id="editCategoria" required>
                     <option value="">Selecione uma categoria</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Data da Despesa</label>
+              <div class="control">
+                <input class="input" type="date" id="editDataDespesa" required max="2025-05-01">
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Tipo</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="editTipo" required>
+                    <option value="variavel">Variável</option>
+                    <option value="fixa">Fixa</option>
                   </select>
                 </div>
               </div>
@@ -309,8 +325,21 @@
     </div>
   </footer>
 </div>
+<!-- Toastify JS -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <script>
-
+// Função para exibir notificações com Toastify
+function showToast(message, type = 'success') {
+  Toastify({
+    text: message,
+    duration: 3000,
+    close: true,
+    gravity: 'top',
+    position: 'right',
+    backgroundColor: type === 'success' ? '#2ecc71' : '#e74c3c',
+    stopOnFocus: true
+  }).showToast();
+}
 
 // Logout
 document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
@@ -324,85 +353,87 @@ function formatarData(data) {
   try {
     const d = new Date(data);
     if (isNaN(d.getTime())) throw new Error('Data inválida');
-    return d.toLocaleString('pt-BR');
+    return d.toLocaleDateString('pt-BR');
   } catch (error) {
     console.error('Erro ao formatar data:', error);
     return 'Data inválida';
   }
 }
 
-// Função para buscar e atualizar o estoque
-async function atualizarEstoque(filtros = {}) {
-  const tbody = document.getElementById('estoqueTable');
+// Função para formatar nome da categoria
+function formatarCategoria(categoria) {
+  if (!categoria) return 'Sem categoria';
+  return categoria.charAt(0).toUpperCase() + categoria.slice(1);
+}
+
+// Função para buscar e atualizar as despesas
+async function atualizarDespesas(filtros = {}) {
+  const tbody = document.getElementById('despesasTable');
   if (!tbody) {
-    console.error('Elemento com ID "estoqueTable" não encontrado no DOM');
-    alert('Erro: Tabela de estoque não encontrada');
+    console.error('Elemento com ID "despesasTable" não encontrado no DOM');
+    showToast('Erro: Tabela de despesas não encontrada', 'error');
     return;
   }
-  tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Carregando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Carregando...</td></tr>';
   try {
     const query = new URLSearchParams(filtros).toString();
-    const response = await fetch(`/api/estoque?${query}`, {
+    const response = await fetch(`/api/despesas?${query}`, {
       headers: { 'Accept': 'application/json' }
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}\nResposta: ${text.substring(0, 100)}`);
+      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    const itens = await response.json();
+    const despesas = await response.json();
     tbody.innerHTML = '';
-    if (!Array.isArray(itens)) {
-      throw new Error('Resposta da API não é um array: ' + JSON.stringify(itens));
+    if (!Array.isArray(despesas)) {
+      throw new Error('Resposta da API não é um array: ' + JSON.stringify(despesas));
     }
-    if (itens.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhum item encontrado</td></tr>';
+    if (despesas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma despesa encontrada</td></tr>';
       return;
     }
-    itens.forEach(item => {
-      if (!item.id || !item.nome || item.quantidade === undefined || item.valor_unitario === undefined || !item.categoria) {
-        console.warn('Item inválido: ' + JSON.stringify(item));
+    despesas.forEach(despesa => {
+      if (!despesa.id || !despesa.descricao || despesa.valor === undefined || !despesa.data_despesa) {
+        console.warn('Despesa inválida: ' + JSON.stringify(despesa));
         return;
       }
-      const isLowStock = item.quantidade < 10;
       const row = document.createElement('tr');
-      row.className = isLowStock ? 'has-background-danger-light' : '';
       row.innerHTML = `
-        <td>${item.id}</td>
-        <td>${item.nome}</td>
-        <td>${item.quantidade}</td>
-        <td>R$ ${parseFloat(item.valor_unitario).toFixed(2)}</td>
-        <td>${item.categoria}</td>
-        <td>${formatarData(item.ultima_atualizacao)}</td>
+        <td>${despesa.id}</td>
+        <td>${despesa.descricao}</td>
+        <td>${parseFloat(despesa.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td>${formatarCategoria(despesa.categoria)}</td>
+        <td>${formatarData(despesa.data_despesa)}</td>
+        <td>${despesa.tipo === 'fixa' ? 'Fixa' : 'Variável'}</td>
+        <td>${formatarData(despesa.data_criacao)}</td>
         <td>
-          <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(item)})'>Editar</button>
+          <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(despesa)})'>Editar</button>
         </td>`;
       tbody.appendChild(row);
     });
-
   } catch (error) {
-    console.error('Erro ao atualizar estoque:', error);
-    tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Erro ao carregar itens: ' + error.message + '</td></tr>';
-    alert('Erro ao carregar estoque: ' + error.message);
+    console.error('Erro ao atualizar despesas:', error);
+    tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Erro ao carregar despesas</td></tr>';
+    showToast('Não foi possível carregar as despesas: ' + error.message, 'error');
   }
 }
 
 // Função para carregar categorias do backend
 async function carregarCategorias() {
-
   try {
-    const response = await fetch('/api/categorias', {
+    const response = await fetch('/api/categorias/despesas', {
       headers: { 'Accept': 'application/json' }
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Erro ao carregar categorias: ${response.status} ${response.statusText}\nResposta: ${text.substring(0, 100)}`);
+      throw new Error(`Erro ao carregar categorias: ${response.status} ${response.statusText}`);
     }
     const categorias = await response.json();
-
     return categorias;
   } catch (error) {
     console.error('Erro ao carregar categorias:', error);
-    alert('Não foi possível carregar as categorias: ' + error.message);
+    showToast('Não foi possível carregar as categorias: ' + error.message, 'error');
     return [];
   }
 }
@@ -413,12 +444,11 @@ function popularSelectComCategorias(selectElement, categorias, valorSelecionado 
     console.error('Elemento <select> não encontrado');
     return;
   }
-
   selectElement.innerHTML = '<option value="">Selecione uma categoria</option>';
   categorias.forEach(categoria => {
     const option = document.createElement('option');
-    option.value = categoria.id;
-    option.textContent = categoria.nome;
+    option.value = categoria.id; // id é o valor do ENUM (ex.: 'utilidades')
+    option.textContent = categoria.nome; // nome é a versão formatada (ex.: 'Utilidades')
     if (categoria.id === valorSelecionado) {
       option.selected = true;
     }
@@ -426,60 +456,72 @@ function popularSelectComCategorias(selectElement, categorias, valorSelecionado 
   });
 }
 
+// Função para atualizar todos os selects de categorias
+async function atualizarSelectsCategorias() {
+  const categorias = await carregarCategorias();
+  const selectFiltroCategoria = document.getElementById('categoria');
+  const selectAddCategoria = document.getElementById('addCategoria');
+  const selectEditCategoria = document.getElementById('editCategoria');
+  if (selectFiltroCategoria) {
+    selectFiltroCategoria.innerHTML = '<option value="">Todas as Categorias</option>';
+    categorias.forEach(categoria => {
+      const option = document.createElement('option');
+      option.value = categoria.id;
+      option.textContent = categoria.nome;
+      selectFiltroCategoria.appendChild(option);
+    });
+  }
+  if (selectAddCategoria) {
+    popularSelectComCategorias(selectAddCategoria, categorias);
+  }
+  if (selectEditCategoria) {
+    popularSelectComCategorias(selectEditCategoria, categorias);
+  }
+}
+
 // Função para adicionar uma nova categoria
 async function addCategoria() {
-
   const novaCategoriaInput = document.getElementById('novaCategoria');
   const novaCategoria = novaCategoriaInput?.value.trim();
-
   if (!novaCategoria) {
-    alert('Por favor, insira o nome da nova categoria');
+    showToast('Por favor, insira o nome da nova categoria', 'error');
     return;
   }
-
+  if (!/^[a-zA-Z\s]{1,50}$/.test(novaCategoria)) {
+    showToast('O nome da categoria deve conter apenas letras e espaços, até 50 caracteres', 'error');
+    return;
+  }
   try {
-    const response = await fetch('/api/categorias', {
+    const response = await fetch('/api/despesas/categorias/adicionar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ novaCategoria })
     });
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+      }
+      throw new Error(errorData.error || errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
     const data = await response.json();
-    alert(data.mensagem);
+    showToast(data.mensagem, 'success');
     novaCategoriaInput.value = '';
-    const categorias = await carregarCategorias();
-    const selectAddCategoria = document.getElementById('addCategoria');
-    const selectEditCategoria = document.getElementById('editCategoria');
-    const selectFiltroCategoria = document.getElementById('categoria');
-    if (selectAddCategoria) {
-      popularSelectComCategorias(selectAddCategoria, categorias);
-    }
-    if (selectEditCategoria) {
-      popularSelectComCategorias(selectEditCategoria, categorias);
-    }
-    if (selectFiltroCategoria) {
-      selectFiltroCategoria.innerHTML = '<option value="">Todas as Categorias</option>';
-      categorias.forEach(categoria => {
-        const option = document.createElement('option');
-        option.value = categoria.id;
-        option.textContent = categoria.nome;
-        selectFiltroCategoria.appendChild(option);
-      });
-    }
+    await atualizarSelectsCategorias();
   } catch (error) {
     console.error('Erro ao adicionar categoria:', error);
-    alert('Erro ao adicionar categoria: ' + error.message);
+    showToast('Não foi possível adicionar a categoria: ' + error.message, 'error');
   }
 }
 
 // Função para abrir modal de adição
 function abrirAddModal() {
-  const modal = document.getElementById('addItemModal');
+  const modal = document.getElementById('addDespesaModal');
   if (!modal) {
-    console.error('Modal addItemModal não encontrado');
+    console.error('Modal addDespesaModal não encontrado');
+    showToast('Erro: Modal de adição não encontrado', 'error');
     return;
   }
   modal.classList.add('is-active');
@@ -489,129 +531,147 @@ function abrirAddModal() {
       popularSelectComCategorias(selectAddCategoria, categorias);
     } else {
       console.error('Elemento addCategoria não encontrado');
+      showToast('Erro: Campo de categoria não encontrado', 'error');
     }
   });
 }
 
 // Função para fechar modal de adição
 function closeAddModal() {
-  const modal = document.getElementById('addItemModal');
+  const modal = document.getElementById('addDespesaModal');
   if (modal) {
     modal.classList.remove('is-active');
-    const form = document.getElementById('addItemForm');
+    const form = document.getElementById('addDespesaForm');
     if (form) form.reset();
   }
 }
 
-// Função para salvar novo item
-async function salvarNovoItem() {
-  const nome = document.getElementById('addNome')?.value;
-  const medida = document.getElementById('addMedida')?.value;
-  const descricao = document.getElementById('addDescricao')?.value;
-  const quantidade = parseInt(document.getElementById('addQuantidade')?.value);
-  const preco = parseFloat(document.getElementById('addPreco')?.value);
+// Função para salvar nova despesa
+async function salvarNovaDespesa() {
+  const descricao = document.getElementById('addDescricao')?.value.trim();
+  const valor = parseFloat(document.getElementById('addValor')?.value);
   const categoria = document.getElementById('addCategoria')?.value;
-
-  if (!nome || isNaN(quantidade) || isNaN(preco) || !categoria || !medida || !categoria) {
-    alert('Preencha todos os campos corretamente');
+  const data_despesa = document.getElementById('addDataDespesa')?.value;
+  const tipo = document.getElementById('addTipo')?.value;
+  const today = new Date().toISOString().split('T')[0];
+  if (!descricao || isNaN(valor) || valor <= 0 || !categoria || !data_despesa || !tipo) {
+    showToast('Por favor, preencha todos os campos corretamente', 'error');
     return;
   }
-
+  if (data_despesa > today) {
+    showToast('A data da despesa não pode ser futura', 'error');
+    return;
+  }
+  if (descricao.length < 3) {
+    showToast('A descrição deve ter pelo menos 3 caracteres', 'error');
+    return;
+  }
   try {
-    const response = await fetch('/api/estoque', {
+    const response = await fetch('/api/despesas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ nome, quantidade, preco, categoria, descricao, medida})
+      body: JSON.stringify({ descricao, valor, categoria, data_despesa, tipo })
     });
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    alert('Item adicionado com sucesso!');
+    showToast('A despesa foi registrada com sucesso', 'success');
     closeAddModal();
-    atualizarEstoque();
+    atualizarDespesas();
   } catch (error) {
-    console.error('Erro ao adicionar item:', error);
-    alert('Erro ao adicionar item: ' + error.message);
+    console.error('Erro ao adicionar despesa:', error);
+    showToast('Não foi possível registrar a despesa: ' + error.message, 'error');
   }
 }
 
 // Função para abrir modal de edição
-function abrirEditModal(item) {
-  const modal = document.getElementById('editItemModal');
+function abrirEditModal(despesa) {
+  const modal = document.getElementById('editDespesaModal');
   if (!modal) {
-    console.error('Modal editItemModal não encontrado');
+    console.error('Modal editDespesaModal não encontrado');
+    showToast('Erro: Modal de edição não encontrado', 'error');
     return;
   }
-  document.getElementById('editId').value = item.id;
-  document.getElementById('editNome').value = item.nome;
-  document.getElementById('editQuantidade').value = item.quantidade;
-  document.getElementById('editPreco').value = parseFloat(item.valor_unitario).toFixed(2);
+  document.getElementById('editId').value = despesa.id;
+  document.getElementById('editDescricao').value = despesa.descricao;
+  document.getElementById('editValor').value = parseFloat(despesa.valor).toFixed(2);
+  document.getElementById('editDataDespesa').value = despesa.data_despesa.split('T')[0];
+  document.getElementById('editTipo').value = despesa.tipo;
   modal.classList.add('is-active');
   carregarCategorias().then(categorias => {
     const selectEditCategoria = document.getElementById('editCategoria');
     if (selectEditCategoria) {
-      popularSelectComCategorias(selectEditCategoria, categorias, item.categoria);
+      popularSelectComCategorias(selectEditCategoria, categorias, despesa.categoria);
     } else {
       console.error('Elemento editCategoria não encontrado');
+      showToast('Erro: Campo de categoria não encontrado', 'error');
     }
   });
 }
 
 // Função para fechar modal de edição
 function closeEditModal() {
-  const modal = document.getElementById('editItemModal');
+  const modal = document.getElementById('editDespesaModal');
   if (modal) modal.classList.remove('is-active');
 }
 
 // Função para salvar edição
 async function salvarEdicao() {
   const id = document.getElementById('editId')?.value;
-  const nome = document.getElementById('editNome')?.value;
-  const quantidade = parseInt(document.getElementById('editQuantidade')?.value);
-  const preco = parseFloat(document.getElementById('editPreco')?.value);
+  const descricao = document.getElementById('editDescricao')?.value.trim();
+  const valor = parseFloat(document.getElementById('editValor')?.value);
   const categoria = document.getElementById('editCategoria')?.value;
-
-  if (!id || !nome || isNaN(quantidade) || isNaN(preco) || !categoria) {
-    alert('Preencha todos os campos corretamente');
+  const data_despesa = document.getElementById('editDataDespesa')?.value;
+  const tipo = document.getElementById('editTipo')?.value;
+  const today = new Date().toISOString().split('T')[0];
+  if (!id || !descricao || isNaN(valor) || valor <= 0 || !categoria || !data_despesa || !tipo) {
+    showToast('Por favor, preencha todos os campos corretamente', 'error');
     return;
   }
-
+  if (data_despesa > today) {
+    showToast('A data da despesa não pode ser futura', 'error');
+    return;
+  }
+  if (descricao.length < 3) {
+    showToast('A descrição deve ter pelo menos 3 caracteres', 'error');
+    return;
+  }
   try {
-    const response = await fetch(`/api/estoque/${id}`, {
-      method: 'PATCH',
+    const response = await fetch(`/api/despesas/${id}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ nome, quantidade, preco, categoria })
+      body: JSON.stringify({ descricao, valor, categoria, data_despesa, tipo })
     });
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    alert('Item atualizado com sucesso!');
+    showToast('A despesa foi atualizada com sucesso', 'success');
     closeEditModal();
-    atualizarEstoque();
+    atualizarDespesas();
   } catch (error) {
-    console.error('Erro ao atualizar item:', error);
-    alert('Erro ao atualizar item: ' + error.message);
+    console.error('Erro ao atualizar despesa:', error);
+    showToast('Não foi possível atualizar a despesa: ' + error.message, 'error');
   }
 }
 
 // Função para confirmar deleção
 function confirmarDelecao() {
-  if (confirm('Tem certeza que deseja deletar este item?')) {
-    deletarItem();
+  if (confirm('Tem certeza que deseja deletar esta despesa?')) {
+    deletarDespesa();
   }
 }
 
-// Função para deletar item
-async function deletarItem() {
+// Função para deletar despesa
+async function deletarDespesa() {
   const id = document.getElementById('editId')?.value;
   if (!id) {
-    alert('ID do item não encontrado');
+    showToast('ID da despesa não encontrado', 'error');
     return;
   }
   try {
-    const response = await fetch(`/api/estoque/${id}`, {
+    const response = await fetch(`/api/despesas/${id}`, {
       method: 'DELETE',
       headers: { 'Accept': 'application/json' }
     });
@@ -619,20 +679,21 @@ async function deletarItem() {
       const errorData = await response.json();
       throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    alert('Item deletado com sucesso!');
+    showToast('A despesa foi deletada com sucesso', 'success');
     closeEditModal();
-    atualizarEstoque();
+    atualizarDespesas();
   } catch (error) {
-    console.error('Erro ao deletar item:', error);
-    alert('Erro ao deletar item: ' + error.message);
+    console.error('Erro ao deletar despesa:', error);
+    showToast('Não foi possível deletar a despesa: ' + error.message, 'error');
   }
 }
 
 // Função para exportar tabela como CSV
 function exportarCsv() {
-  const table = document.getElementById('estoqueTable');
+  const table = document.getElementById('despesasTable');
   if (!table) {
-    console.error('Tabela estoqueTable não encontrada');
+    console.error('Tabela despesasTable não encontrada');
+    showToast('Erro: Tabela de despesas não encontrada', 'error');
     return;
   }
   let csv = [];
@@ -646,7 +707,7 @@ function exportarCsv() {
   const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv.join('\n'));
   const link = document.createElement('a');
   link.setAttribute('href', csvContent);
-  link.setAttribute('download', `estoque_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `despesas_${new Date().toISOString().split('T')[0]}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -655,55 +716,47 @@ function exportarCsv() {
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    // Carrega o estoque
-    atualizarEstoque();
+    // Carrega as despesas
+    atualizarDespesas();
 
-    // Carrega categorias no filtro
-    carregarCategorias().then(categorias => {
-      const selectFiltroCategoria = document.getElementById('categoria');
-      if (selectFiltroCategoria) {
-        selectFiltroCategoria.innerHTML = '<option value="">Todas as Categorias</option>';
-        categorias.forEach(categoria => {
-          const option = document.createElement('option');
-          option.value = categoria.id;
-          option.textContent = categoria.nome;
-          selectFiltroCategoria.appendChild(option);
-        });
-      }
-    });
+    // Carrega categorias no filtro, adição e edição
+    atualizarSelectsCategorias();
 
-    // Filtro de estoque
-    const filterForm = document.getElementById('filterEstoqueForm');
+    // Filtro de despesas
+    const filterForm = document.getElementById('filterDespesasForm');
     if (filterForm) {
       filterForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const filtros = {
-          nome: document.getElementById('nomeItem')?.value || '',
+          descricao: document.getElementById('descricao')?.value || '',
           categoria: document.getElementById('categoria')?.value || '',
-          estoque_baixo: document.getElementById('estoqueBaixo')?.value || ''
+          tipo: document.getElementById('tipo')?.value || ''
         };
-        atualizarEstoque(filtros);
+        atualizarDespesas(filtros);
       });
     } else {
-      console.error('Formulário filterEstoqueForm não encontrado');
+      console.error('Formulário filterDespesasForm não encontrado');
+      showToast('Erro: Formulário de filtros não encontrado', 'error');
     }
 
     // Botão de atualização
-    const refreshBtn = document.getElementById('refreshEstoqueBtn');
+    const refreshBtn = document.getElementById('refreshDespesasBtn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => {
-        atualizarEstoque();
+        atualizarDespesas();
       });
     } else {
-      console.error('Botão refreshEstoqueBtn não encontrado');
+      console.error('Botão refreshDespesasBtn não encontrado');
+      showToast('Erro: Botão de atualização não encontrado', 'error');
     }
 
-    // Botão de adicionar item
-    const addItemBtn = document.getElementById('addItemBtn');
-    if (addItemBtn) {
-      addItemBtn.addEventListener('click', abrirAddModal);
+    // Botão de adicionar despesa
+    const addDespesaBtn = document.getElementById('addDespesaBtn');
+    if (addDespesaBtn) {
+      addDespesaBtn.addEventListener('click', abrirAddModal);
     } else {
-      console.error('Botão addItemBtn não encontrado');
+      console.error('Botão addDespesaBtn não encontrado');
+      showToast('Erro: Botão de adição não encontrado', 'error');
     }
 
     // Botão de exportar CSV
@@ -712,6 +765,7 @@ document.addEventListener('DOMContentLoaded', () => {
       exportCsvBtn.addEventListener('click', exportarCsv);
     } else {
       console.error('Botão exportCsvBtn não encontrado');
+      showToast('Erro: Botão de exportação não encontrado', 'error');
     }
 
     // Formulário de adicionar categoria
@@ -723,18 +777,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } else {
       console.error('Formulário addCategoriaForm não encontrado');
+      showToast('Erro: Formulário de adição de categoria não encontrado', 'error');
     }
   } catch (error) {
     console.error('Erro na inicialização:', error);
-    alert('Erro na inicialização da página: ' + error.message);
+    showToast('Erro na inicialização da página: ' + error.message, 'error');
   }
 });
 </script>
-
-<!-- Scripts below are for demo only -->
-<script type="text/javascript" src="js/main.min.js"></script>
-
-<!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
-<link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
 </body>
 </html>

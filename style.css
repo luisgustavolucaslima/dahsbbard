@@ -118,13 +118,13 @@ h1 {
 }
 
 :root[data-theme="light"] body {
-  background: url('/img/background.png') no-repeat center center fixed;
+  background: url('admin/img/background.png') no-repeat center center fixed;
   background-size: cover;
   color: #000;
 }
 
 :root[data-theme="dark"] body {
-  background: url('/img/backgrounddark.png') no-repeat center center fixed;
+  background: url('admin/img/backgrounddark.png') no-repeat center center fixed;
   background-size: cover;
   color: #fff;
 }
