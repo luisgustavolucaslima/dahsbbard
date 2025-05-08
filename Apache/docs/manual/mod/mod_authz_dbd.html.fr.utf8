@@ -188,7 +188,7 @@ DBDExptime 300
   # contenir un lien vers /team-private/login.html
   ErrorDocument 401 "/login-info.html"
 
-  &lt;Files "login.html"&gt;
+  &lt;Files ../login.html&gt;
     # il n'est pas nécessaire que l'utilisateur soit déjà connecté !
     AuthDBDUserPWQuery "SELECT password FROM authn WHERE user = %s"
 

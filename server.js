@@ -16,10 +16,21 @@ app.use(express.json());
 
 app.get('/pedidos_diarios', async (req, res) => {
   try {
-    const [pedidos] = await db.query(
-      "SELECT * FROM pedidos_diarios WHERE DATE(data) = CURDATE() ORDER BY data"
-    );
-    res.json(pedidos); 
+    const [pedidos] = await db.query(`
+      SELECT 
+        pd.id, pd.cliente_numero, pd.status, pd.valido, pd.data_hora, pd.data, 
+        pd.endereco, pd.recebido, pd.venda_id,
+        GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as produtos,
+        v.valor_total
+      FROM pedidos_diarios pd
+      LEFT JOIN vendas v ON pd.venda_id = v.id
+      LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
+      LEFT JOIN estoque e ON pi.produto_id = e.id
+      WHERE DATE(pd.data) = CURDATE()
+      GROUP BY pd.id
+      ORDER BY pd.data DESC
+    `);
+    res.json(pedidos);
   } catch (err) {
     console.error("Erro ao buscar pedidos:", err);
     res.status(500).json({ erro: 'Erro ao buscar pedidos' });
@@ -28,15 +39,34 @@ app.get('/pedidos_diarios', async (req, res) => {
 
 app.post('/alterar_status', async (req, res) => {
   const { id, statusAtual } = req.body;
+  const validStatuses = ['novo', 'embalado', 'entrega', 'rua', 'finalizado', 'falha', 'incorreto'];
   const transicoes = {
     novo: 'embalado',
     embalado: 'entrega',
     entrega: 'rua',
     rua: 'finalizado'
   };
+
+  if (!id || !statusAtual || !validStatuses.includes(statusAtual)) {
+    return res.status(400).json({ erro: 'ID ou status atual inválido' });
+  }
+
   const novoStatus = transicoes[statusAtual] || statusAtual;
+
   try {
-    await db.query("UPDATE pedidos_diarios SET status = ? WHERE id = ?", [novoStatus, id]);
+    const [result] = await db.query(
+      "UPDATE pedidos_diarios SET status = ? WHERE id = ?",
+      [novoStatus, id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erro: 'Pedido não encontrado' });
+    }
+
+    await db.query(
+      "INSERT INTO log_alteracoes (tabela, registro_id, acao, usuario_id, detalhes) VALUES (?, ?, ?, ?, ?)",
+      ['pedidos_diarios', id, 'UPDATE', null, `Status alterado de ${statusAtual} para ${novoStatus}`]
+    );
+
     res.status(200).json({ mensagem: `Status alterado para ${novoStatus}` });
   } catch (err) {
     console.error("Erro ao alterar status:", err);
@@ -46,14 +76,20 @@ app.post('/alterar_status', async (req, res) => {
 
 app.get('/resumo_diario', async (req, res) => {
   try {
-    const [[{ total_vendas, total_valor }]] = await db.query(`
-      SELECT COUNT(*) AS total_vendas, SUM(valor_pago) AS total_valor
-      FROM pedidos_diarios
-      WHERE DATE(data) = CURDATE()
+    const [[resumo]] = await db.query(`
+      SELECT 
+        COUNT(v.id) AS total_vendas, 
+        SUM(v.valor_pago) AS total_valor
+      FROM vendas v
+      LEFT JOIN pedidos_diarios pd ON pd.venda_id = v.id
+      WHERE DATE(pd.data) = CURDATE()
     `);
-    res.json({ total_vendas, total_valor: total_valor || 0 });
+    res.json({
+      total_vendas: resumo.total_vendas || 0,
+      total_valor: resumo.total_valor || 0
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Erro ao buscar resumo:", err);
     res.status(500).json({ erro: 'Erro ao buscar resumo' });
   }
 });
@@ -62,9 +98,14 @@ app.post('/enviar_para_entrega', async (req, res) => {
   try {
     const { rota } = req.body;
     const [pedidos] = await db.query(`
-      SELECT id, cliente_numero, itens, data, endereco, recebido
-      FROM pedidos_diarios
-      WHERE status = 'entrega' AND DATE(data) = CURDATE()
+      SELECT 
+        pd.id, pd.cliente_numero, pd.data, pd.endereco, pd.recebido,
+        GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as itens
+      FROM pedidos_diarios pd
+      LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
+      LEFT JOIN estoque e ON pi.produto_id = e.id
+      WHERE pd.status = 'entrega' AND DATE(pd.data) = CURDATE()
+      GROUP BY pd.id
     `);
     const quantidade_pedidos = pedidos.length;
     for (const pedido of pedidos) {
@@ -75,7 +116,7 @@ app.post('/enviar_para_entrega', async (req, res) => {
       `, [
         pedido.id,
         pedido.cliente_numero,
-        pedido.itens,
+        pedido.itens || '',
         pedido.endereco,
         pedido.recebido,
         rota,
@@ -130,7 +171,12 @@ app.post('/login', async (req, res) => {
 
 app.get('/comprovante/:id', async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT comprovante FROM pedidos_diarios WHERE id = ?", [req.params.id]);
+    const [rows] = await db.query(`
+      SELECT v.comprovante 
+      FROM vendas v
+      JOIN pedidos_diarios pd ON pd.venda_id = v.id
+      WHERE pd.id = ?
+    `, [req.params.id]);
     if (!rows.length || !rows[0].comprovante) return res.sendStatus(404);
     res.set('Content-Type', 'image/png').send(rows[0].comprovante);
   } catch (err) {
@@ -241,65 +287,26 @@ app.get('/api/dashboard', async (req, res) => {
       ORDER BY valor_total DESC
       LIMIT 5
     `);
-    const [vendas] = await db.query(`
-      SELECT itens
-      FROM vendas
-      WHERE DATE(data) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    const [itensVendidos] = await db.query(`
+      SELECT 
+        e.id, e.nome, e.valor_unitario, e.categoria,
+        SUM(pi.quantidade) AS quantidade_vendida,
+        SUM(pi.quantidade * e.valor_unitario) AS receita_total
+      FROM pedido_itens pi
+      JOIN pedidos_diarios pd ON pi.pedido_id = pd.id
+      JOIN estoque e ON pi.produto_id = e.id
+      WHERE DATE(pd.data) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      GROUP BY e.id, e.nome, e.valor_unitario, e.categoria
+      ORDER BY quantidade_vendida DESC
+      LIMIT 5
     `);
-    const produtoVendas = {};
-    for (const venda of vendas) {
-      try {
-        // Tentar parsear itens como JSON
-        let itensArray;
-        try {
-          itensArray = JSON.parse(venda.itens);
-        } catch {
-          // Se não for JSON, tratar como string simples
-          itensArray = [venda.itens.replace(/[\[\]]/g, '')];
-        }
-        for (let item of itensArray) {
-          item = item.trim();
-          // Extrair apenas o nome do produto, removendo quantidade e unidade
-          const nomeProduto = item.split(' - ')[0].trim();
-          if (nomeProduto) {
-            const [[produto]] = await db.query('SELECT id, nome, valor_unitario, categoria FROM estoque WHERE nome = ?', [nomeProduto]);
-            if (produto) {
-              const id = produto.id;
-              if (!produtoVendas[id]) {
-                produtoVendas[id] = { quantidade: 0, receita: 0 };
-              }
-              // Incrementar quantidade (assumindo 1 unidade por venda; ajustar se necessário)
-              produtoVendas[id].quantidade += 1;
-              produtoVendas[id].receita += produto.valor_unitario;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Erro ao processar itens:', venda.itens, e.message);
-      }
-    }
-    const topProdutos = await Promise.all(
-      Object.keys(produtoVendas).map(async id => {
-        const [[produto]] = await db.query('SELECT nome, valor_unitario, categoria FROM estoque WHERE id = ?', [id]);
-        if (produto) {
-          return {
-            id,
-            nome: produto.nome,
-            categoria: produto.categoria,
-            quantidade_vendida: produtoVendas[id].quantidade,
-            receita_total: produtoVendas[id].receita
-          };
-        }
-        return null;
-      })
-    );
-    const topProdutosFiltrados = topProdutos
-      .filter(p => p)
-      .sort((a, b) => b.quantidade_vendida - a.quantidade_vendida)
-      .slice(0, 5);
-    if (topProdutosFiltrados.length === 0) {
-      console.warn('Nenhum produto encontrado para topProdutos');
-    }
+    const topProdutos = itensVendidos.map(item => ({
+      id: item.id,
+      nome: item.nome,
+      categoria: item.categoria,
+      quantidade_vendida: Number(item.quantidade_vendida),
+      receita_total: Number(item.receita_total)
+    }));
     const [vendasDiarias] = await db.query(`
       SELECT 
         DATE(data) AS data,
@@ -315,7 +322,7 @@ app.get('/api/dashboard', async (req, res) => {
       valorMedio: vendasInfo.valorMedio || 0,
       baixoEstoque: baixoEstoque.baixoEstoque || 0,
       topCompradores,
-      topProdutos: topProdutosFiltrados,
+      topProdutos,
       vendasDiarias
     });
   } catch (err) {
@@ -485,35 +492,40 @@ app.get('/api/vendas', async (req, res) => {
     const params = [];
     let whereClauses = [];
     if (cliente_numero) {
-      whereClauses.push('cliente_numero LIKE ?');
+      whereClauses.push('v.cliente_numero LIKE ?');
       params.push(`%${cliente_numero}%`);
     }
     if (data_inicio) {
-      whereClauses.push('DATE(data) >= ?');
+      whereClauses.push('DATE(v.data) >= ?');
       params.push(data_inicio);
     }
     if (data_fim) {
-      whereClauses.push('DATE(data) <= ?');
+      whereClauses.push('DATE(v.data) <= ?');
       params.push(data_fim);
     }
     if (status) {
-      whereClauses.push('status = ?');
+      whereClauses.push('v.status = ?');
       params.push(status);
     }
     const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
     const query = `
       SELECT 
-        id,
-        COALESCE(cliente_numero, '') AS cliente_numero,
-        COALESCE(valor_pago, 0) AS valor_pago,
-        COALESCE(forma_pagamento, 'pix') AS forma_pagamento,
-        COALESCE(data, NOW()) AS data,
-        COALESCE(endereco, '') AS endereco,
-        COALESCE(status, 'novo') AS status,
-        comprovante IS NOT NULL AS tem_comprovante
-      FROM vendas
+        v.id,
+        COALESCE(v.cliente_numero, '') AS cliente_numero,
+        COALESCE(v.valor_pago, 0) AS valor_pago,
+        COALESCE(v.forma_pagamento, 'pix') AS forma_pagamento,
+        COALESCE(v.data, NOW()) AS data,
+        COALESCE(v.endereco, '') AS endereco,
+        COALESCE(v.status, 'novo') AS status,
+        v.comprovante IS NOT NULL AS tem_comprovante,
+        GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) AS produtos
+      FROM vendas v
+      LEFT JOIN pedidos_diarios pd ON pd.venda_id = v.id
+      LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
+      LEFT JOIN estoque e ON pi.produto_id = e.id
       ${where}
-      ORDER BY data DESC
+      GROUP BY v.id
+      ORDER BY v.data DESC
     `;
     const [vendas] = await db.query(query, params);
     res.json(vendas);
@@ -526,7 +538,7 @@ app.get('/api/vendas', async (req, res) => {
 app.patch('/api/vendas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { forma_pagamento, status, valor_pago} = req.body;
+    const { forma_pagamento, status, valor_pago } = req.body;
     if (!forma_pagamento || !status || valor_pago === undefined || valor_pago === '') {
       return res.status(400).json({ erro: 'Forma de pagamento, status e valor são obrigatórios' });
     }

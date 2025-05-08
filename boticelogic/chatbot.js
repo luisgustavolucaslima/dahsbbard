@@ -1,113 +1,455 @@
-const { Client } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const TelegramBot = require('node-telegram-bot-api');
 const mysql = require('mysql2/promise');
 const moment = require('moment');
-const axios = require('axios');
-const GOOGLE_API_KEY = 'AIzaSyBpqMDBX4ic49y85K4-3dNJyxkZwD2rZ9c'; // substitua pela sua chave real
+const bcrypt = require('bcrypt');
+require('dotenv').config();
+
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const SENHA_MESTRE = '#acesso123';
-const tratarEstoque = require('./setores/estoque');
 const tratarEntrega = require('./setores/entrega');
 const tratarVendas = require('./setores/vendas');
-const client = new Client();
-const db = mysql.createPool({ host: 'localhost', user: 'root', password: '', database: 'iceclubestoque' });
 
-const sessoes = new Map(); // controle de sessão ativa
+// Timeout de sessão (15 minutos em milissegundos)
+const SESSION_TIMEOUT = 15 * 60 * 1000;
+const MESSAGE_TIMEOUT = 30000; // 30 segundos para exclusão de mensagens
 
-client.on('qr', qr => qrcode.generate(qr, { small: true }));
-client.on('ready', () => console.log('✅ Bot pronto!'));
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+const db = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'iceclubestoque'
+});
 
-client.on('message', async msg => {
-  const numero = msg.from.replace('@c.us', '');
+const sessoes = new Map();
+
+console.log('[INFO] ✅ Bot do Telegram iniciado!');
+
+// Função para enviar mensagem com timeout de exclusão
+const enviarMensagem = async (chatId, mensagem, options = {}) => {
+  try {
+    if (!chatId || !mensagem) {
+      console.error('[ERROR] Parâmetros inválidos para enviarMensagem:', { chatId, mensagem });
+      return null;
+    }
+    const sentMessage = await bot.sendMessage(chatId, mensagem, { parse_mode: 'Markdown', ...options });
+    setTimeout(async () => {
+      try {
+        await bot.deleteMessage(chatId, sentMessage.message_id);
+      } catch (err) {
+        console.error(`[ERROR] Erro ao deletar mensagem ${sentMessage.message_id}:`, err.message);
+      }
+    }, MESSAGE_TIMEOUT);
+    return sentMessage;
+  } catch (err) {
+    console.error(`[ERROR] Erro ao enviar mensagem para ${chatId}:`, err.message);
+    return null;
+  }
+};
+
+// Função para enviar mensagem com botão de sair
+const enviarBotaoSair = async (chatId, mensagem) => {
+  const keyboard = {
+    inline_keyboard: [[{ text: '🛑 Sair', callback_data: 'sair' }]]
+  };
+  return enviarMensagem(chatId, mensagem, { reply_markup: keyboard });
+};
+
+// Função para enviar menu de setores com base no cargo
+const enviarMenuSetores = async (chatId, cargo, enviarMensagem) => {
+  console.log(`[DEBUG] Enviando menu de setores para cargo: ${cargo || 'nulo'}`);
+
+  if (!chatId || !enviarMensagem) {
+    console.error('[ERROR] Parâmetros inválidos para enviarMenuSetores:', { chatId, enviarMensagem });
+    return enviarMensagem(chatId, '⚠️ *Erro interno. Tente novamente.*');
+  }
+
+  if (!cargo) {
+    console.log(`[DEBUG] Cargo nulo, sem permissão para setores`);
+    return enviarMensagem(chatId, '⚠️ *Setores não disponíveis. Você não tem permissão. Contate o administrador.*');
+  }
+
+  const cargoNormalizado = cargo.toLowerCase();
+  const keyboard = {
+    inline_keyboard: []
+  };
+
+  if (cargoNormalizado === 'vendedor') {
+    keyboard.inline_keyboard.push([{ text: '🛍️ Vendas', callback_data: 'setor_vendas' }]);
+  } else if (cargoNormalizado === 'entregador') {
+    keyboard.inline_keyboard.push([{ text: '🚚 Entrega', callback_data: 'setor_entrega' }]);
+  } else {
+    console.log(`[DEBUG] Cargo inválido: ${cargo}`);
+    return enviarMensagem(chatId, '⚠️ *Cargo inválido. Contate o administrador.*');
+  }
+
+  keyboard.inline_keyboard.push([{ text: '🛑 Sair', callback_data: 'sair' }]);
+
+  return enviarMensagem(chatId, `ℹ️ *Bem-vindo(a) ao setor ${cargoNormalizado.toUpperCase()}! Escolha uma opção:*`, {
+    reply_markup: keyboard
+  });
+};
+
+// Função para solicitar o número de telefone
+const solicitarNumeroTelefone = async (chatId) => {
+  const keyboard = {
+    keyboard: [[{ text: '📱 Compartilhar Número', request_contact: true }]],
+    one_time_keyboard: true,
+    resize_keyboard: true
+  };
+  try {
+    await bot.sendMessage(chatId, '📲 *Por favor, compartilhe seu número de telefone para completar o cadastro.*', {
+      reply_markup: keyboard
+    });
+  } catch (err) {
+    console.error(`[ERROR] Erro ao solicitar número de telefone para ${chatId}:`, err.message);
+    await enviarMensagem(chatId, '⚠️ *Erro ao solicitar número de telefone. Tente novamente.*');
+  }
+};
+
+// Função para limpar mensagens do chat
+const limparMensagensChat = async (chatId) => {
+  try {
+    console.log(`[DEBUG] Iniciando limpeza de mensagens para chatId: ${chatId}`);
+    
+    // Enviar uma mensagem temporária para obter um message_id recente
+    const tempMessage = await bot.sendMessage(chatId, '🧹 Iniciando limpeza...', { parse_mode: 'Markdown' });
+    let messageId = tempMessage.message_id;
+    await bot.deleteMessage(chatId, messageId); // Deletar a mensagem temporária
+    
+    let mensagensDeletadas = 0;
+    const maxMensagens = 100; // Limite para evitar sobrecarga
+    const minMessageId = Math.max(1, messageId - maxMensagens); // Evitar IDs negativos
+
+    while (messageId >= minMessageId && mensagensDeletadas < maxMensagens) {
+      try {
+        await bot.deleteMessage(chatId, messageId);
+        mensagensDeletadas++;
+        console.log(`[DEBUG] Mensagem ${messageId} deletada com sucesso.`);
+      } catch (err) {
+        // Ignorar erros esperados
+        if (err.message.includes('message to delete not found') || 
+            err.message.includes('message can\'t be deleted') || 
+            err.message.includes('Too Many Requests')) {
+          console.log(`[DEBUG] Não foi possível deletar mensagem ${messageId}: ${err.message}`);
+        } else {
+          console.error(`[ERROR] Erro inesperado ao deletar mensagem ${messageId}:`, err.message);
+        }
+      }
+      messageId--; // Decrementar para tentar a próxima mensagem
+      // Pequena pausa para evitar rate limiting
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    console.log(`[DEBUG] Limpeza concluída: ${mensagensDeletadas} mensagens deletadas.`);
+    return mensagensDeletadas;
+  } catch (err) {
+    console.error(`[ERROR] Erro ao limpar mensagens para ${chatId}:`, err.message);
+    return 0;
+  }
+};
+
+// Listener para capturar o número de telefone
+bot.on('contact', async (msg) => {
+  const chatId = msg.chat?.id?.toString();
+  const phoneNumber = msg.contact?.phone_number;
+
+  if (!chatId || !phoneNumber) {
+    console.error('[ERROR] Contato inválido:', msg);
+    return enviarMensagem(chatId, '⚠️ *Número de telefone inválido. Tente novamente.*');
+  }
+
+  try {
+    await db.query('UPDATE usuarios SET numero = ? WHERE chat_id = ?', [phoneNumber, chatId]);
+    await enviarMensagem(chatId, `✅ *Número ${phoneNumber} salvo com sucesso!* Agora, envie sua *senha pessoal* (mínimo 4 caracteres).`);
+  } catch (err) {
+    console.error(`[ERROR] Erro ao salvar número de telefone para ${chatId}:`, err.message);
+    await enviarMensagem(chatId, '⚠️ *Erro ao salvar o número de telefone. Tente novamente.*');
+  }
+});
+
+// Manipula mensagens (texto, fotos, etc.)
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id.toString();
   const hoje = moment().format('YYYY-MM-DD');
-  const texto = msg.body.trim();
-  const [usuarios] = await db.query('SELECT * FROM usuarios WHERE numero = ?', [numero]);
-
-  let sessao = sessoes.get(numero) || { setor: null, data: hoje, autenticado: false };
+  let sessao = sessoes.get(chatId) || {
+    setor: null,
+    data: hoje,
+    autenticado: false,
+    logado: false,
+    usuario_id: null,
+    cargo: null,
+    lastUpdated: Date.now()
+  };
 
   // Reseta sessão se for de outro dia
   if (sessao.data !== hoje) {
-    sessao = { setor: null, data: hoje, autenticado: false };
-    sessoes.set(numero, sessao);
+    sessao = {
+      setor: null,
+      data: hoje,
+      autenticado: false,
+      logado: false,
+      usuario_id: null,
+      cargo: null,
+      lastUpdated: Date.now()
+    };
+    sessoes.set(chatId, sessao);
+  }
+
+  // Verifica timeout de sessão
+  if (sessao.lastUpdated && Date.now() - sessao.lastUpdated > SESSION_TIMEOUT) {
+    sessoes.delete(chatId);
+    return enviarMensagem(chatId, '🕒 *Sessão expirada. Envie sua senha pessoal para continuar.*');
+  }
+  sessao.lastUpdated = Date.now();
+
+  // Comando para limpar mensagens
+  if (msg.text && msg.text.toLowerCase() === '/limpar') {
+    if (!sessao.logado) {
+      return enviarMensagem(chatId, '🔒 *Você precisa estar logado para usar o comando /limpar.* Envie sua senha pessoal.');
+    }
+    const mensagensDeletadas = await limparMensagensChat(chatId);
+    return enviarMensagem(chatId, `🧹 *Limpeza concluída! ${mensagensDeletadas} mensagens deletadas.*`);
+  }
+
+  // Consulta usuários
+  let usuarios;
+  try {
+    [usuarios] = await db.query('SELECT id, numero, senha, cargo, nome, ultima_sessao FROM usuarios WHERE chat_id = ?', [chatId]);
+  } catch (err) {
+    console.error(`[ERROR] Erro ao consultar usuários para ${chatId}:`, err.message);
+    return enviarMensagem(chatId, '⚠️ *Erro ao acessar o sistema. Tente novamente.*');
   }
 
   // NOVO USUÁRIO
   if (!usuarios.length) {
-    if (texto !== SENHA_MESTRE) return msg.reply('🔒 Envie a senha de acesso para registrar-se.');
-    await db.query('INSERT INTO usuarios (numero, nome, senha, ultima_sessao) VALUES (?, ?, ?, ?)', [numero, numero, null, hoje]);
-    sessoes.set(numero, sessao);
-    return msg.reply('✅ Acesso liberado! Agora, envie sua senha pessoal para completar o cadastro.');
+    if (!msg.text || msg.text !== SENHA_MESTRE) {
+      return enviarMensagem(chatId, '🔒 *Envie a senha de acesso para se registrar.*');
+    }
+    try {
+      const [result] = await db.query(
+        'INSERT INTO usuarios (chat_id, senha, cargo, ultima_sessao, data_registro) VALUES (?, ?, ?, ?, ?)',
+        [chatId, null, null, hoje, hoje]
+      );
+      sessao.usuario_id = result.insertId;
+      sessao.cargo = null;
+      sessao.lastUpdated = Date.now();
+      sessoes.set(chatId, sessao);
+      await solicitarNumeroTelefone(chatId);
+      return enviarMensagem(chatId, '✅ *Acesso liberado!* Compartilhe seu número e envie sua senha pessoal para completar o cadastro.');
+    } catch (err) {
+      console.error(`[ERROR] Erro ao criar usuário para ${chatId}:`, err.message);
+      return enviarMensagem(chatId, '⚠️ *Erro ao registrar usuário. Tente novamente.*');
+    }
   }
 
   const usuario = usuarios[0];
+  sessao.usuario_id = usuario.id;
+  sessao.cargo = usuario.cargo;
+  sessao.nome = usuario.nome;
 
   // USUÁRIO EXISTE MAS SEM SENHA
   if (!usuario.senha) {
-    if (texto.length < 4) return msg.reply('❗ A senha deve ter pelo menos 4 caracteres.');
-    await db.query('UPDATE usuarios SET senha = ?, ultima_sessao = ? WHERE numero = ?', [texto, hoje, numero]);
-    sessoes.set(numero, sessao);
-    return msg.reply('✅ Conta criada com sucesso!\n🔓 Escolha um setor:\n1️⃣ Entrega\n2️⃣ Estoque\n3️⃣ Vendas');
+    if (!usuario.numero) {
+      await solicitarNumeroTelefone(chatId);
+      return enviarMensagem(chatId, '❗ *Compartilhe seu número de telefone antes de definir a senha.*');
+    }
+    if (!msg.text || msg.text.length < 4) {
+      return enviarMensagem(chatId, '❗ *A senha deve ter pelo menos 4 caracteres.*');
+    }
+    try {
+      await db.query(
+        'UPDATE usuarios SET senha = SHA2(?, 256), ultima_sessao = ? WHERE chat_id = ?',
+        [msg.text, hoje, chatId]
+      );
+      sessao.logado = true;
+      sessao.lastUpdated = Date.now();
+      sessoes.set(chatId, sessao);
+      return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
+    } catch (err) {
+      console.error(`[ERROR] Erro ao atualizar senha para ${chatId}:`, err.message);
+      return enviarMensagem(chatId, '⚠️ *Erro ao salvar senha. Tente novamente.*');
+    }
   }
 
   // VERIFICAÇÃO DE SENHA PESSOAL
   if (!sessao.logado) {
-    if (texto !== usuario.senha) return msg.reply('❌ Senha incorreta. Envie sua senha pessoal para acessar.');
-    sessao.logado = true;
-    sessoes.set(numero, sessao);
-    return msg.reply('🔓 Login diário realizado!\n\nEscolha:\n1️⃣ Entrega\n2️⃣ Estoque\n3️⃣ Vendas');
-  }
-
-  // SAIR
-  if (texto.toLowerCase() === 'sair') {
-    sessoes.delete(numero);
-    return msg.reply('🛑 Você saiu do fluxo. Para começar de novo, envie "oi".');
-  }
-
-  // SELEÇÃO DE SETOR
-  if (['1', '2', '3'].includes(texto)) {
-    if (sessao.autenticado) {
-      return msg.reply('⚠️ Você já está autenticado em um setor. Envie "sair" para reiniciar.');
+    if (!msg.text) {
+      return enviarMensagem(chatId, '🔒 *Envie sua senha pessoal para acessar.*');
     }
-    const setores = { '1': 'entrega', '2': 'estoque', '3': 'vendas' };
-    sessao.setor = setores[texto];
-    sessoes.set(numero, sessao);
-    return msg.reply(`🔑 Setor selecionado: ${sessao.setor.toUpperCase()}\nEnvie a senha do setor para continuar.`);
-  }
-  
-
-  // VERIFICA SE ESCOLHEU SETOR
-  if (!sessao.setor) {
-    return msg.reply('ℹ️ Escolha um setor para continuar:\n1️⃣ Entrega\n2️⃣ Estoque\n3️⃣ Vendas');
+    try {
+      const [rows] = await db.query(
+        'SELECT id, cargo, nome FROM usuarios WHERE chat_id = ? AND senha = SHA2(?, 256)',
+        [chatId, msg.text]
+      );
+      if (!rows.length) {
+        return enviarMensagem(chatId, '❌ *Senha incorreta. Envie sua senha pessoal para acessar.*');
+      }
+      sessao.logado = true;
+      sessao.cargo = rows[0].cargo;
+      sessao.nome = rows[0].nome;
+      sessao.lastUpdated = Date.now();
+      sessoes.set(chatId, sessao);
+      console.log(`[DEBUG] Usuário autenticado: chatId=${chatId}, nome=${sessao.nome || 'desconhecido'}, cargo=${sessao.cargo || 'nulo'}`);
+      return enviarMensagem(chatId, `🔓 *Bem-vindo(a), ${sessao.nome || 'Usuário'}! Login diário realizado!*`, {
+        reply_markup: { inline_keyboard: [[{ text: '➡️ Escolher Setor', callback_data: 'escolher_setor' }]] }
+      });
+    } catch (err) {
+      console.error(`[ERROR] Erro ao verificar senha para ${chatId}:`, err.message);
+      return enviarMensagem(chatId, '⚠️ *Erro ao verificar senha. Tente novamente.*');
+    }
   }
 
   // AUTENTICAÇÃO DO SETOR
-  const senhasSetor = { entrega: 'entrega123', estoque: 'estoque123', vendas: 'venda123' };
-  if (!sessao.autenticado) {
-    if (texto === senhasSetor[sessao.setor]) {
+  if (sessao.setor && !sessao.autenticado) {
+    if (!msg.text || !msg.text.trim()) {
+      return enviarMensagem(chatId, `🔐 *Envie a senha do setor ${sessao.setor?.toUpperCase() || 'DESCONHECIDO'} para acessar.*`);
+    }
+
+    try {
+      const [setores] = await db.query(
+        'SELECT senha_setor FROM setores WHERE nome_setor = ?',
+        [sessao.setor]
+      );
+
+      if (!setores.length) {
+        console.log(`[DEBUG] Setor inválido: ${sessao.setor}`);
+        return enviarMensagem(chatId, '⚠️ *Setor inválido ou não configurado.*');
+      }
+
+      const senhaCorreta = await bcrypt.compare(msg.text, setores[0].senha_setor);
+      if (!senhaCorreta) {
+        return enviarMensagem(chatId, `🔐 *Senha incorreta. Envie a senha do setor ${sessao.setor?.toUpperCase() || 'DESCONHECIDO'} para acessar.*`);
+      }
+
       sessao.autenticado = true;
-      sessoes.set(numero, sessao); // <- garante que o estado foi salvo
-      return msg.reply(`✅ Acesso ao setor ${sessao.setor.toUpperCase()} liberado.`);
-    } else {
-      return msg.reply(`🔐 Envie a senha correta do setor *${sessao.setor.toUpperCase()}* para acessar.`);
+      sessao.lastUpdated = Date.now();
+      sessoes.set(chatId, sessao);
+      const mensagem = sessao.cargo === null
+        ? `✅ *Acesso ao setor ${sessao.setor.toUpperCase()} liberado.*\nℹ️ Seu cargo ainda não foi definido.`
+        : `✅ *Acesso ao setor ${sessao.setor.toUpperCase()} liberado, use "ajuda" para ver os comandos*`;
+      return enviarBotaoSair(chatId, mensagem);
+    } catch (err) {
+      console.error(`[ERROR] Erro ao autenticar setor ${sessao.setor} para ${chatId}:`, err.message);
+      return enviarMensagem(chatId, '⚠️ *Erro ao autenticar setor. Tente novamente.*');
     }
   }
-  
 
   // EXECUTA O FLUXO DO SETOR
-  try {
-    switch (sessao.setor) {
-      case 'vendas':
-        return await tratarVendas(texto, msg, sessao, db, client);
-      case 'estoque':
-        return await tratarEstoque(texto, msg, sessao, db, client);
-      case 'entrega':
-        return await tratarEntrega(texto, msg, sessao, db, client, numero, sessoes);
-      default:
-        return msg.reply('❓ Setor inválido. Envie "1", "2" ou "3" para escolher.');
+  if (sessao.autenticado && sessao.setor) {
+    try {
+      switch (sessao.setor.toLowerCase()) {
+        case 'vendas':
+          // Passa a mensagem completa (que pode conter texto ou foto)
+          return await tratarVendas(msg.text || '', msg, sessao, db, bot);
+        case 'entrega':
+          return await tratarEntrega(msg.text || '', msg, sessao, db, bot, chatId, sessoes);
+        default:
+          console.log(`[DEBUG] Setor desconhecido: ${sessao.setor}`);
+          return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
+      }
+    } catch (err) {
+      console.error(`[ERROR] Erro no setor ${sessao.setor} para ${chatId}:`, err.message);
+      return enviarMensagem(chatId, '⚠️ *Erro ao processar sua solicitação. Tente novamente.*');
     }
-  } catch (err) {
-    console.error('Erro no setor:', err);
-    return msg.reply('⚠️ Ocorreu um erro ao processar sua solicitação.');
   }
+
+  // Caso não esteja em um fluxo específico
+  return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
 });
 
-client.initialize();
+// Manipula cliques nos botões inline
+bot.on('callback_query', async (query) => {
+  const chatId = query.message?.chat?.id?.toString();
+  const data = query.data;
+
+  if (!chatId || !data) {
+    console.error('[ERROR] Callback query inválida:', query);
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  let sessao = sessoes.get(chatId) || {
+    setor: null,
+    data: moment().format('YYYY-MM-DD'),
+    autenticado: false,
+    logado: false,
+    usuario_id: null,
+    cargo: null,
+    lastUpdated: Date.now()
+  };
+
+  if (sessao.data !== moment().format('YYYY-MM-DD')) {
+    sessao = {
+      setor: null,
+      data: moment().format('YYYY-MM-DD'),
+      autenticado: false,
+      logado: false,
+      usuario_id: null,
+      cargo: null,
+      lastUpdated: Date.now()
+    };
+    sessoes.set(chatId, sessao);
+  }
+
+  try {
+    // Verifica se o usuário está no setor vendas e autenticado
+    if (sessao.setor === 'vendas' && sessao.autenticado) {
+      bot.answerCallbackQuery(query.id);
+      return await tratarVendas(query, { chat: { id: chatId } }, sessao, db, bot);
+    }
+
+    if (data.startsWith('setor_')) {
+      if (sessao.autenticado) {
+        bot.answerCallbackQuery(query.id);
+        return enviarMensagem(
+          chatId,
+          '⚠️ *Você já está autenticado em um setor. Clique em Sair para reiniciar.*',
+          { reply_markup: { inline_keyboard: [[{ text: '🛑 Sair', callback_data: 'sair' }]] } }
+        );
+      }
+      const setor = data.replace('setor_', '');
+      if (!['vendas', 'entrega'].includes(setor)) {
+        console.log(`[DEBUG] Setor inválido selecionado: ${setor}`);
+        bot.answerCallbackQuery(query.id);
+        return enviarMensagem(chatId, '⚠️ *Setor inválido. Escolha novamente.*');
+      }
+      // Valida se o setor é permitido pelo cargo
+      const cargoNormalizado = sessao.cargo?.toLowerCase();
+      if (
+        (setor === 'vendas' && cargoNormalizado !== 'vendedor') ||
+        (setor === 'entrega' && cargoNormalizado !== 'entregador')
+      ) {
+        console.log(`[DEBUG] Setor ${setor} não permitido para cargo ${sessao.cargo || 'nulo'}`);
+        bot.answerCallbackQuery(query.id);
+        return enviarMensagem(chatId, '⚠️ *Você não tem permissão para acessar este setor.*');
+      }
+      sessao.setor = setor;
+      sessao.lastUpdated = Date.now();
+      sessoes.set(chatId, sessao);
+      bot.answerCallbackQuery(query.id);
+      return enviarMensagem(
+        chatId,
+        `🔑 *Setor selecionado: ${sessao.setor.toUpperCase()}.*\nEnvie a senha do setor para continuar.`
+      );
+    }
+
+    if (data === 'escolher_setor') {
+      bot.answerCallbackQuery(query.id);
+      return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
+    }
+
+    if (data === 'sair') {
+      sessoes.delete(chatId);
+      bot.answerCallbackQuery(query.id);
+      return enviarMensagem(chatId, '🛑 *Você saiu do fluxo.* Para começar, envie *oi* ou sua senha pessoal.');
+    }
+
+    bot.answerCallbackQuery(query.id);
+    return enviarMensagem(chatId, '⚠️ *Ação inválida. Tente novamente.*');
+  } catch (err) {
+    console.error(`[ERROR] Erro ao processar callback para ${chatId}:`, err.message);
+    bot.answerCallbackQuery(query.id);
+    return enviarMensagem(chatId, '⚠️ *Erro ao processar ação. Tente novamente.*');
+  }
+});

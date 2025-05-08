@@ -53,7 +53,7 @@
       // Verifica se o usuário está autenticado
       if (!usuario || !permissao) {
         alert('Usuário ou permissão inválidos. Redirecionando para login.');
-        window.location.href = 'login.html'; // Redireciona para login se não autenticado
+        window.location.href = '../login.html'; // Redireciona para login se não autenticado
         return;
       }
 
@@ -64,7 +64,7 @@
         window.location.href = 'admin/index.html'; // Redireciona para o painel admin
       } else {
         alert('Permissão inválida. Redirecionando para login.');
-        window.location.href = 'login.html'; // Caso a permissão não seja válida
+        window.location.href = '../login.html'; // Caso a permissão não seja válida
       }
     }
   </script>

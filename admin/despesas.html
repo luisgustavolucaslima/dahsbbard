@@ -14,6 +14,24 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 </head>
 <body>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const usuario = localStorage.getItem('usuario');
+      const permissao = localStorage.getItem('permissao');
+  
+      // Verifica se o usuário e permissão estão armazenados no localStorage
+      if (!usuario || !permissao) {
+        alert('Você não está autenticado! Redirecionando para o login...');
+        window.location.href = '../login.html'; // Redireciona para a página de login
+      }
+  
+      // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
+      if (permissao !== 'admin') {
+        alert('Você não tem permissão para acessar essa área!');
+        window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
+      }
+    });
+  </script>
 <div id="app">
   <nav id="navbar-main" class="navbar is-fixed-top">
     <div class="navbar-brand">
