@@ -58,10 +58,12 @@
       }
 
       // Redireciona o usuário para a página correta com base na permissão
-      if (permissao === 'almoxarifado') {
-        window.location.href = 'almoxarifado.html'; // Redireciona para o painel do almoxarifado
+      if (permissao === 'producao') {
+        window.location.href = 'producao.html'; // Redireciona para o painel do almoxarifado
       } else if (permissao === 'admin') {
         window.location.href = 'admin/index.html'; // Redireciona para o painel admin
+      }  else if (permissao === 'vendas') {
+        window.location.href = 'vendas/index.html'; // Redireciona para o painel admin
       } else {
         alert('Permissão inválida. Redirecionando para login.');
         window.location.href = '../login.html'; // Caso a permissão não seja válida

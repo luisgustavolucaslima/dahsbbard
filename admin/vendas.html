@@ -5,137 +5,184 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Vendas</title>
-  
-    <!-- Bulma is included -->
     <link rel="stylesheet" href="css/main.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <!-- Fonts -->
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+    <style>
+      :root {
+        --primary-color: #3273dc;
+        --secondary-color: #f5f5f5;
+        --text-color: #4a4a4a;
+      }
+      .table th, .table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .table th {
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .table-container {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-top: 1rem;
+      }
+      .modal-card-body {
+        padding: 2rem;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+      .loader {
+        border: 16px solid #f3f3f3;
+        border-top: 16px solid var(--primary-color);
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        animation: spin 2s linear infinite;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        display: none;
+      }
+      @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+      .button.is-primary {
+        background-color: var(--primary-color);
+      }
+      .field.is-grouped .control {
+        margin-right: 0.75rem;
+      }
+      .box#comprovanteContainer {
+        text-align: center;
+      }
+      #notification {
+        max-width: 400px;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: opacity 0.5s ease;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        display: none;
+      }
+      #notification.is-info {
+        background-color: #dff0ff;
+        color: #3273dc;
+      }
+      #notification .delete {
+        margin-left: 1rem;
+      }
+    </style>
   </head>
-<body>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const usuario = localStorage.getItem('usuario');
-      const permissao = localStorage.getItem('permissao');
-  
-      // Verifica se o usuário e permissão estão armazenados no localStorage
-      if (!usuario || !permissao) {
-        alert('Você não está autenticado! Redirecionando para o login...');
-        window.location.href = '../login.html'; // Redireciona para a página de login
-      }
-  
-      // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
-      if (permissao !== 'admin') {
-        alert('Você não tem permissão para acessar essa área!');
-        window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
-      }
-    });
-  </script>
-  <div id="app">
-    <nav id="navbar-main" class="navbar is-fixed-top">
-      <div class="navbar-brand">
-        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
-          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
-        </a>
+  <body>
+    <div id="loader" class="loader"></div>
+    <div id="app">
+      <div id="notification" class="notification is-info is-light" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 1000;">
+        <button class="delete" onclick="hideNotification()"></button>
+        <p id="notificationMessage"></p>
       </div>
-      <div class="navbar-brand is-right">
-        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
-          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
-        </a>
-      </div>
-      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
-        <div class="navbar-end">
-          <a title="Log out" class="navbar-item is-desktop-icon-only">
-            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+      <nav id="navbar-main" class="navbar is-fixed-top">
+        <div class="navbar-brand">
+          <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+            <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
           </a>
         </div>
-      </div>
-    </nav>
-    <aside class="aside is-placed-left is-expanded">
-      <div class="aside-tools">
-        <div class="aside-tools-label">
-          <span><b>Admin</b></span>
+        <div class="navbar-brand is-right">
+          <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+            <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+          </a>
         </div>
-      </div>
-      <div class="menu is-menu-main">
-        <p class="menu-label">Geral</p>
-        <ul class="menu-list">
-          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-          <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
-          <li><a href="estoque.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-          <li><a href="despesas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
-        </ul>
-        <p class="menu-label">Logic Ice</p>
-        <ul class="menu-list">
-          <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
-          <li><a href="vendas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
-          <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
-        </ul>
-      </div>
-  </aside>
-  <section class="section is-title-bar">
-    <div class="level">
-      <div class="level-left">
-        <div class="level-item">
-          <ul>
-            <li>Admin</li>
-            <li>Vendas</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-  <section class="hero is-hero-bar">
-    <div class="hero-body">
-      <div class="level">
-        <div class="level-left">
-          <div class="level-item"><h1 class="title">Vendas</h1></div>
-        </div>
-        <div class="level-right">
-          <div class="level-item">
-            <button id="refreshVendasBtn" class="button is-primary">Atualizar</button>
+        <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+          <div class="navbar-end">
+            <a title="Log out" class="navbar-item is-desktop-icon-only">
+              <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+            </a>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
-  <section class="section is-main-section">
-    <!-- Vendas Diárias -->
-    <div class="card mb-6">
-      <header class="card-header">
-        <p class="card-header-title">
-          <span class="icon"><i class="mdi mdi-ballot"></i></span>
-          Vendas Diárias
-        </p>
-      </header>
-      <div class="card-content">
-        <form id="filterVendasForm">
-          <div class="field is-horizontal is-spaced">
-            <div class="field-label is-normal">
-              <label class="label">Filtros</label>
+      </nav>
+      <aside class="aside is-placed-left is-expanded">
+        <div class="aside-tools">
+          <div class="aside-tools-label">
+            <span><b>Admin</b></span>
+          </div>
+        </div>
+        <div class="menu is-menu-main">
+          <p class="menu-label">Geral</p>
+          <ul class="menu-list">
+            <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+            <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
+            <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+            <li><a href="despesas.html" class="has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
+          </ul>
+          <p class="menu-label">Logic Ice</p>
+          <ul class="menu-list">
+            <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+            <li><a href="vendas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+            <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
+          </ul>
+        </div>
+      </aside>
+      <section class="section is-title-bar">
+        <div class="level">
+          <div class="level-left">
+            <div class="level-item">
+              <ul>
+                <li>Admin</li>
+                <li>Vendas</li>
+              </ul>
             </div>
-            <div class="field-body">
-              <div class="field mr-4">
+          </div>
+        </div>
+      </section>
+      <section class="hero is-hero-bar">
+        <div class="hero-body">
+          <div class="level">
+            <div class="level-left">
+              <div class="level-item"><h1 class="title">Vendas</h1></div>
+            </div>
+            <div class="level-right">
+              <div class="level-item">
+                <button id="refreshVendasBtn" class="button is-primary">Atualizar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="section is-main-section">
+        <div class="card mb-6">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="mdi mdi-ballot"></i></span>
+              Vendas Diárias
+            </p>
+          </header>
+          <div class="card-content">
+            <form id="filterVendasForm">
+              <div class="field is-grouped">
                 <p class="control is-expanded has-icons-left">
                   <input class="input" type="text" id="clienteNumero" placeholder="Número do Cliente">
                   <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
                 </p>
-              </div>
-              <div class="field mr-4">
                 <p class="control is-expanded has-icons-left">
                   <input class="input" type="date" id="dataInicio" placeholder="Data Início">
                   <span class="icon is-small is-left"><i class="mdi mdi-calendar"></i></span>
                 </p>
-              </div>
-              <div class="field mr-4">
                 <p class="control is-expanded has-icons-left">
                   <input class="input" type="date" id="dataFim" placeholder="Data Fim">
                   <span class="icon is-small is-left"><i class="mdi mdi-calendar"></i></span>
                 </p>
-              </div>
-              <div class="field mr-4 is-narrow">
-                <div class="control">
+                <p class="control">
                   <div class="select is-fullwidth">
                     <select id="statusVenda">
                       <option value="">Todos os Status</option>
@@ -143,493 +190,449 @@
                       <option value="falha">Falha</option>
                     </select>
                   </div>
-                </div>
-              </div>
-              <div class="field">
-                <div class="control">
+                </p>
+                <p class="control">
                   <button type="submit" class="button is-primary">Filtrar</button>
-                </div>
+                </p>
               </div>
+            </form>
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable is-bordered">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Valor Pago</th>
+                    <th>Forma de Pagamento</th>
+                    <th>Data</th>
+                    <th>Endereço</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="vendasTable"></tbody>
+              </table>
             </div>
           </div>
-        </form>
-        <div class="table-container">
-          <table class="table is-fullwidth is-striped is-hoverable">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>Valor Pago</th>
-                <th>Forma de Pagamento</th>
-                <th>Data</th>
-                <th>Endereço</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="vendasTable"></tbody>
-          </table>
         </div>
-      </div>
-    </div>
-    <!-- Vendas por Clientes -->
-    <div class="card mb-6">
-      <header class="card-header">
-        <p class="card-header-title">
-          <span class="icon"><i class="mdi mdi-ballot-outline"></i></span>
-          Vendas por Clientes
-        </p>
-      </header>
-      <div class="card-content">
-        <form id="filterClientesForm">
-          <div class="field is-horizontal is-spaced">
-            <div class="field-label is-normal">
-              <label class="label">Buscar Cliente</label>
-            </div>
-            <div class="field-body">
-              <div class="field mr-4">
+        <div class="card mb-6">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="mdi mdi-ballot-outline"></i></span>
+              Vendas por Clientes
+            </p>
+          </header>
+          <div class="card-content">
+            <form id="filterClientesForm">
+              <div class="field is-grouped">
                 <p class="control is-expanded has-icons-left">
                   <input class="input" type="text" id="buscaCliente" placeholder="Número ou Nome do Cliente">
                   <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
                 </p>
-              </div>
-              <div class="field">
-                <div class="control">
+                <p class="control">
                   <button type="submit" class="button is-primary">Buscar</button>
-                </div>
+                </p>
               </div>
+            </form>
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable is-bordered">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Total de Vendas</th>
+                    <th>Valor Total</th>
+                    <th>Última Compra</th>
+                  </tr>
+                </thead>
+                <tbody id="clientesTable"></tbody>
+              </table>
             </div>
           </div>
-        </form>
-        <div class="table-container">
-          <table class="table is-fullwidth is-striped is-hoverable">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Total de Vendas</th>
-                <th>Valor Total</th>
-                <th>Última Compra</th>
-              </tr>
-            </thead>
-            <tbody id="clientesTable"></tbody>
-          </table>
         </div>
-      </div>
-    </div>
-<!-- Nova Seção: Vendas -->
-<div class="card mb-6">
-  <header class="card-header">
-    <p class="card-header-title">
-      <span class="icon"><i class="mdi mdi-ballot-outline"></i></span>
-      Vendas
-    </p>
-  </header>
-  <div class="card-content">
-    <form id="filterVendasForm2">
-      <div class="field is-horizontal is-spaced">
-        <div class="field-label is-normal">
-          <label class="label">Buscar Cliente</label>
-        </div>
-        <div class="field-body">
-          <div class="field mr-4">
-            <p class="control is-expanded has-icons-left">
-              <input class="input" type="text" id="buscaCliente" placeholder="Número ou Nome do Cliente">
-              <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
+        <div class="card mb-6">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="mdi mdi-ballot-outline"></i></span>
+              Vendas
             </p>
-          </div>
-          <div class="field">
-            <div class="control">
-              <button type="submit" class="button is-primary">Buscar</button>
+          </header>
+          <div class="card-content">
+            <form id="filterVendasForm2">
+              <div class="field is-grouped">
+                <p class="control is-expanded has-icons-left">
+                  <input class="input" type="text" id="buscaCliente2" placeholder="Número ou Nome do Cliente">
+                  <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
+                </p>
+                <p class="control">
+                  <button type="submit" class="button is-primary">Buscar</button>
+                </p>
+              </div>
+            </form>
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable is-bordered">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Valor Pago</th>
+                    <th>Forma de Pagamento</th>
+                    <th>Data</th>
+                    <th>Endereço</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="vendasTable2"></tbody>
+              </table>
             </div>
           </div>
         </div>
-      </div>
-    </form>
-    <div class="table-container">
-      <table class="table is-fullwidth is-striped is-hoverable">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Cliente</th>
-            <th>Valor Pago</th>
-            <th>Forma de Pagamento</th>
-            <th>Data</th>
-            <th>Endereço</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody id="vendasTable2"></tbody>
-      </table>
+        <div class="modal" id="editVendaModal">
+          <div class="modal-background"></div>
+          <div class="modal-card">
+            <header class="modal-card-head">
+              <p class="modal-card-title">Editar Venda</p>
+              <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
+            </header>
+            <section class="modal-card-body">
+              <form id="editVendaForm">
+                <div class="field">
+                  <label class="label">ID</label>
+                  <div class="control">
+                    <input class="input" type="text" id="editId" readonly>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Cliente</label>
+                  <div class="control">
+                    <input class="input" type="text" id="editClienteNumero" readonly>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Valor Pago</label>
+                  <div class="control">
+                    <input class="input" type="number" id="editValorPago" step="0.01">
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Forma de Pagamento</label>
+                  <div class="control">
+                    <div class="select is-fullwidth">
+                      <select id="editFormaPagamento">
+                        <option value="pix">Pix</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="cartao">Cartão</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Data</label>
+                  <div class="control">
+                    <input class="input" type="text" id="editData" readonly>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Endereço</label>
+                  <div class="control">
+                    <input class="input" type="text" id="editEndereco" readonly>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Status</label>
+                  <div class="control">
+                    <div class="select is-fullwidth">
+                      <select id="editStatus">
+                        <option value="novo">Novo</option>
+                        <option value="recebido">Recebido</option>
+                        <option value="falha">Falha</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Comprovante</label>
+                  <div class="control">
+                    <div id="comprovanteContainer" class="box">
+                      <p id="noComprovanteMsg" class="is-hidden">Nenhum comprovante disponível</p>
+                      <img id="comprovanteImg" class="is-hidden" style="max-width: 100%; height: auto;" alt="Comprovante">
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </section>
+            <footer class="modal-card-foot">
+              <button class="button is-success" onclick="salvarEdicao()">Salvar</button>
+              <button class="button" onclick="closeEditModal()">Cancelar</button>
+            </footer>
+          </div>
+        </div>
+      </section>
+      <footer class="footer">
+        <div class="container-fluid">
+          <div class="level">
+            <div class="level-left">
+              <div class="level-item">© 2025, M</div>
+              <div class="level-item">
+                <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
-  </div>
-</div>
-    
-    <!-- Modal de Edição -->
-    <div class="modal" id="editVendaModal">
-      <div class="modal-background"></div>
-      <div class="modal-card">
-        <header class="modal-card-head">
-          <p class="modal-card-title">Editar Venda</p>
-          <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
-        </header>
-        <section class="modal-card-body">
-          <form id="editVendaForm">
-            <div class="field">
-              <label class="label">ID</label>
-              <div class="control">
-                <input class="input" type="text" id="editId" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Cliente</label>
-              <div class="control">
-                <input class="input" type="text" id="editClienteNumero" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Valor Pago</label>
-              <div class="control">
-                <input class="input" type="number" id="editValorPago" step="0.01">
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Forma de Pagamento</label>
-              <div class="control">
-                <div class="select is-fullwidth">
-                  <select id="editFormaPagamento">
-                    <option value="pix">Pix</option>
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="cartao">Cartão</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Data</label>
-              <div class="control">
-                <input class="input" type="text" id="editData" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Endereço</label>
-              <div class="control">
-                <input class="input" type="text" id="editEndereco" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Status</label>
-              <div class="control">
-                <div class="select is-fullwidth">
-                  <select id="editStatus">
-                    <option value="novo">Novo</option>
-                    <option value="recebido">Recebido</option>
-                    <option value="falha">Falha</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Comprovante</label>
-              <div class="control">
-                <div id="comprovanteContainer" class="box">
-                  <p id="noComprovanteMsg" class="is-hidden">Nenhum comprovante disponível</p>
-                  <img id="comprovanteImg" class="is-hidden" style="max-width: 100%; height: auto;" alt="Comprovante">
-                </div>
-              </div>
-            </div>
-          </form>
-        </section>
-        <footer class="modal-card-foot">
-          <button class="button is-success" onclick="salvarEdicao()">Salvar</button>
-          <button class="button" onclick="closeEditModal()">Cancelar</button>
-        </footer>
-      </div>
-    </div>
-  </section>
-            
-  <script>
-    
+    <script type="text/javascript" src="js/main.min.js"></script>
+    <script>
+      function showNotification(message, type = 'info') {
+        const notification = document.getElementById('notification');
+        const messageElement = document.getElementById('notificationMessage');
+        messageElement.textContent = message;
+        notification.className = `notification is-${type} is-light`;
+        notification.style.display = 'block';
+        notification.style.opacity = '1';
 
-    // Logout
-    document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
-      localStorage.removeItem('usuario');
-      localStorage.removeItem('permissao');
-      window.location.href = '../login.html';
+        setTimeout(() => {
+          notification.style.opacity = '0';
+          setTimeout(() => {
+            notification.style.display = 'none';
+          }, 500);
+        }, 3000);
+      }
+
+      function hideNotification() {
+        const notification = document.getElementById('notification');
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          notification.style.display = 'none';
+        }, 500);
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const usuario = localStorage.getItem('usuario');
+        const permissao = localStorage.getItem('permissao');
+        if (!usuario || !permissao) {
+          showNotification('Você não está autenticado! Redirecionando para o login...', 'danger');
+          setTimeout(() => { window.location.href = '../login.html'; }, 3000);
+        }
+      });
+
+      document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+        localStorage.removeItem('usuario');
+        localStorage.removeItem('permissao');
+        window.location.href = '../login.html';
+      });
+
+      function formatarData(data) {
+        const d = new Date(data);
+        return d.toLocaleString('pt-BR');
+      }
+
+      function formatarCliente(numero) {
+        return numero.replace('@c.us', '');
+      }
+
+      async function atualizarVendas(filtros = {}) {
+        document.getElementById('loader').style.display = 'block';
+        try {
+          const query = new URLSearchParams(filtros).toString();
+          const response = await fetch(`/api/vendas?${query}`);
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          const vendas = await response.json();
+          const tbody = document.getElementById('vendasTable');
+          tbody.innerHTML = '';
+          vendas.forEach(venda => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${venda.id}</td>
+              <td>${formatarCliente(venda.cliente_numero)}</td>
+              <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
+              <td>${venda.forma_pagamento}</td>
+              <td>${formatarData(venda.data)}</td>
+              <td>${venda.endereco}</td>
+              <td>${venda.status}</td>
+              <td>
+                <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
+              </td>`;
+            tbody.appendChild(row);
+          });
+          if (vendas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
+          }
+        } catch (error) {
+          showNotification('Erro ao carregar vendas: ' + error.message, 'danger');
+        } finally {
+          document.getElementById('loader').style.display = 'none';
+        }
+      }
+
+      async function atualizarVendasPorCliente(busca = '') {
+        document.getElementById('loader').style.display = 'block';
+        try {
+          const response = await fetch(`/api/vendas-por-cliente?busca=${encodeURIComponent(busca)}`);
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          const clientes = await response.json();
+          const tbody = document.getElementById('clientesTable');
+          tbody.innerHTML = '';
+          clientes.forEach(cliente => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${formatarCliente(cliente.cliente_numero)}</td>
+              <td>${cliente.total_vendas}</td>
+              <td>R$ ${parseFloat(cliente.valor_total || 0).toFixed(2)}</td>
+              <td>${cliente.ultima_compra ? formatarData(cliente.ultima_compra) : 'N/A'}</td>
+            `;
+            tbody.appendChild(row);
+          });
+          if (clientes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered">Nenhum cliente encontrado</td></tr>';
+          }
+        } catch (error) {
+          showNotification('Erro ao carregar vendas por cliente: ' + error.message, 'danger');
+        } finally {
+          document.getElementById('loader').style.display = 'none';
+        }
+      }
+
+      async function Vendas(filtros = {}) {
+        document.getElementById('loader').style.display = 'block';
+        try {
+          const query = new URLSearchParams(filtros).toString();
+          const response = await fetch(`/api/vendas?${query}`);
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          const vendas = await response.json();
+          const tbody = document.getElementById('vendasTable2');
+          tbody.innerHTML = '';
+          vendas.forEach(venda => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${venda.id}</td>
+              <td>${formatarCliente(venda.cliente_numero)}</td>
+              <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
+              <td>${venda.forma_pagamento}</td>
+              <td>${formatarData(venda.data)}</td>
+              <td>${venda.endereco}</td>
+              <td>${venda.status}</td>
+              <td>
+                <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
+              </td>`;
+            tbody.appendChild(row);
+          });
+          if (vendas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
+          }
+        } catch (error) {
+          showNotification('Erro ao carregar vendas: ' + error.message, 'danger');
+        } finally {
+          document.getElementById('loader').style.display = 'none';
+        }
+      }
+
+      async function visualizarComprovante(vendaId) {
+  const response = await fetch(`/comprovante/${vendaId}`);
+  const data = await response.json();
+  if (data.image) {
+    document.getElementById('comprovanteImg').src = data.image;
+    document.getElementById('comprovanteImg').classList.remove('is-hidden');
+    document.getElementById('noComprovanteMsg').classList.add('is-hidden');
+    document.getElementById('editVendaModal').classList.add('is-active');
+  } else {
+    document.getElementById('comprovanteImg').classList.add('is-hidden');
+    document.getElementById('noComprovanteMsg').classList.remove('is-hidden');
+    document.getElementById('editVendaModal').classList.add('is-active');
+  }
+}
+
+async function abrirEditModal(venda) {
+  document.getElementById('editId').value = venda.id;
+  document.getElementById('editClienteNumero').value = formatarCliente(venda.cliente_numero);
+  document.getElementById('editValorPago').value = parseFloat(venda.valor_pago || 0).toFixed(2);
+  document.getElementById('editFormaPagamento').value = venda.forma_pagamento;
+  document.getElementById('editData').value = formatarData(venda.data);
+  document.getElementById('editEndereco').value = venda.endereco;
+  document.getElementById('editStatus').value = venda.status;
+
+  if (venda.tem_comprovante) {
+    const response = await fetch(`/comprovante/${venda.id}`);
+    const data = await response.json();
+    if (data.image) {
+      document.getElementById('comprovanteImg').src = data.image;
+      document.getElementById('comprovanteImg').classList.remove('is-hidden');
+      document.getElementById('noComprovanteMsg').classList.add('is-hidden');
+    } else {
+      document.getElementById('comprovanteImg').classList.add('is-hidden');
+      document.getElementById('noComprovanteMsg').classList.remove('is-hidden');
+    }
+  } else {
+    document.getElementById('comprovanteImg').classList.add('is-hidden');
+    document.getElementById('noComprovanteMsg').classList.remove('is-hidden');
+  }
+
+  document.getElementById('editVendaModal').classList.add('is-active');
+}
+
+function closeEditModal() {
+  document.getElementById('editVendaModal').classList.remove('is-active');
+  document.getElementById('comprovanteImg').src = '';
+}
+
+async function salvarEdicao() {
+  const vendaId = document.getElementById('editId').value;
+  const forma_pagamento = document.getElementById('editFormaPagamento').value;
+  const status = document.getElementById('editStatus').value;
+  const valor_pago = parseFloat(document.getElementById('editValorPago').value.replace(',', '.'));
+  try {
+    const response = await fetch(`/api/vendas/${vendaId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forma_pagamento, status, valor_pago })
     });
-    
-    // Função para formatar datas
-    function formatarData(data) {
-      const d = new Date(data);
-      return d.toLocaleString('pt-BR');
-    }
-    
-    // Função para formatar número do cliente
-    function formatarCliente(numero) {
-      return numero.replace('@c.us', '');
-    }
-    
-    // Função para buscar e atualizar vendas diárias
-    async function atualizarVendas(filtros = {}) {
-      try {
-        const query = new URLSearchParams(filtros).toString();
-        const response = await fetch(`/api/vendas?${query}`);
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const vendas = await response.json();
-        const tbody = document.getElementById('vendasTable');
-        tbody.innerHTML = '';
-        vendas.forEach(venda => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${venda.id}</td>
-            <td>${formatarCliente(venda.cliente_numero)}</td>
-            <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
-            <td>${venda.forma_pagamento}</td>
-            <td>${formatarData(venda.data)}</td>
-            <td>${venda.endereco}</td>
-            <td>${venda.status}</td>
-            <td>
-              ${venda.tem_comprovante ? `<button class="button is-small is-info" onclick="visualizarComprovante(${venda.id})">Comprovante</button>` : ''}
-              <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
-            </td>`;
+    if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+    showNotification('Venda atualizada com sucesso!', 'success');
+    closeEditModal();
+    atualizarVendas();
+    Vendas();
+  } catch (error) {
+    showNotification('Erro ao salvar edição: ' + error.message, 'danger');
+  }
+}
 
-              tbody.appendChild(row);});
-        if (vendas.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
-        }
-      } catch (error) {
-        alert('Erro ao carregar vendas: ' + error.message);
-      }
-    }
-    
-    async function Vendas(filtros = {}) {
-      try {
-        const query = new URLSearchParams(filtros).toString();
-        const response = await fetch(`/api/vendas?${query}`);
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const vendas = await response.json();
-        const tbody = document.getElementById('vendasTable2');
-        tbody.innerHTML = '';
-        vendas.forEach(venda => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${venda.id}</td>
-            <td>${formatarCliente(venda.cliente_numero)}</td>
-            <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
-            <td>${venda.forma_pagamento}</td>
-            <td>${formatarData(venda.data)}</td>
-            <td>${venda.endereco}</td>
-            <td>${venda.status}</td>
-            <td>
-              ${venda.tem_comprovante ? `<button class="button is-small is-info" onclick="visualizarComprovante(${venda.id})">Comprovante</button>` : ''}
-              <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
-            </td>`;
-
-              tbody.appendChild(row);});
-        if (vendas.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
-        }
-      } catch (error) {
-        alert('Erro ao carregar vendas: ' + error.message);
-      }
-    }
-    
-
-    // Função para buscar e atualizar vendas por cliente
-    async function atualizarVendasPorCliente(busca = '') {
-      try {
-        const response = await fetch(`/api/vendas-por-cliente?busca=${encodeURIComponent(busca)}`);
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const clientes = await response.json();
-        const tbody = document.getElementById('clientesTable');
-        tbody.innerHTML = '';
-        clientes.forEach(cliente => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${formatarCliente(cliente.cliente_numero)}</td>
-            <td>${cliente.total_vendas}</td>
-            <td>R$ ${parseFloat(cliente.valor_total || 0).toFixed(2)}</td>
-            <td>${cliente.ultima_compra ? formatarData(cliente.ultima_compra) : 'N/A'}</td>
-          `;
-          tbody.appendChild(row);
-        });
-        if (clientes.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered">Nenhum cliente encontrado</td></tr>';
-        }
-      } catch (error) {
-        alert('Erro ao carregar vendas por cliente: ' + error.message);
-      }
-    }
-    
-    // Função para visualizar comprovante (mantida para compatibilidade)
-    function visualizarComprovante(vendaId) {
-      window.open(`/comprovante/${vendaId}`, '_blank');
-    }
-    
-    // Função para abrir o modal de edição
-    function abrirEditModal(venda) {
-      document.getElementById('editId').value = venda.id;
-      document.getElementById('editClienteNumero').value = formatarCliente(venda.cliente_numero);
-      document.getElementById('editValorPago').value = parseFloat(venda.valor_pago || 0).toFixed(2);
-      document.getElementById('editFormaPagamento').value = venda.forma_pagamento;
-      document.getElementById('editData').value = formatarData(venda.data);
-      document.getElementById('editEndereco').value = venda.endereco;
-      document.getElementById('editStatus').value = venda.status;
-    
-      // Carregar comprovante
-      const comprovanteImg = document.getElementById('comprovanteImg');
-      const noComprovanteMsg = document.getElementById('noComprovanteMsg');
-      if (venda.tem_comprovante) {
-        comprovanteImg.src = `/comprovante/${venda.id}`;
-        comprovanteImg.classList.remove('is-hidden');
-        noComprovanteMsg.classList.add('is-hidden');
-      } else {
-        comprovanteImg.classList.add('is-hidden');
-        noComprovanteMsg.classList.remove('is-hidden');
-      }
-    
-      document.getElementById('editVendaModal').classList.add('is-active');
-    }
-    
-    // Função para fechar o modal
-    function closeEditModal() {
-      document.getElementById('editVendaModal').classList.remove('is-active');
-      document.getElementById('comprovanteImg').src = ''; // Limpar imagem
-    }
-    
-    // Função para salvar edição
-    async function salvarEdicao() {
-      const vendaId = document.getElementById('editId').value;
-      const forma_pagamento = document.getElementById('editFormaPagamento').value;
-      const status = document.getElementById('editStatus').value;
-      const valor_pago = parseFloat(document.getElementById('editValorPago').value.replace(',', '.'));
-
-    
-      try {
-        const response = await fetch(`/api/vendas/${vendaId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ forma_pagamento, status, valor_pago })
-        });
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        alert('Venda atualizada com sucesso!');
-        closeEditModal();
-        atualizarVendas();
-        Vendas(); // Atualizar tabela após edição
-      } catch (error) {
-        console.error('Erro ao salvar edição:', error);
-        alert('Erro ao salvar edição: ' + error.message);
-      }
-    }
-    
-    // Inicialização
-    document.addEventListener('DOMContentLoaded', () => {
-      atualizarVendas();
-      atualizarVendasPorCliente();
-      Vendas();
-    
-      // Filtro de vendas
-      document.getElementById('filterVendasForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const filtros = {
-          cliente_numero: document.getElementById('clienteNumero').value,
-          data_inicio: document.getElementById('dataInicio').value,
-          data_fim: document.getElementById('dataFim').value,
-          status: document.getElementById('statusVenda').value,
-        };
-        atualizarVendas(filtros);
-        Vendas(filtros);
-      });
-    
-      // Busca por cliente
-      document.getElementById('filterClientesForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const busca = document.getElementById('buscaCliente').value;
-        atualizarVendasPorCliente(busca);
-        Vendas(busca);
-      });
-    
-      // Botão de atualização
-      document.getElementById('refreshVendasBtn').addEventListener('click', () => {
+      document.addEventListener('DOMContentLoaded', () => {
         atualizarVendas();
         atualizarVendasPorCliente();
         Vendas();
+
+        document.getElementById('filterVendasForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const filtros = {
+            cliente_numero: document.getElementById('clienteNumero').value,
+            data_inicio: document.getElementById('dataInicio').value,
+            data_fim: document.getElementById('dataFim').value,
+            status: document.getElementById('statusVenda').value,
+          };
+          atualizarVendas(filtros);
+          Vendas(filtros);
+        });
+
+        document.getElementById('filterClientesForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const busca = document.getElementById('buscaCliente').value;
+          atualizarVendasPorCliente(busca);
+        });
+
+        document.getElementById('filterVendasForm2').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const filtros = {
+            cliente_numero: document.getElementById('buscaCliente2').value,
+          };
+          Vendas(filtros);
+        });
+
+        document.getElementById('refreshVendasBtn').addEventListener('click', () => {
+          atualizarVendas();
+          atualizarVendasPorCliente();
+          Vendas();
+        });
       });
-    });
     </script>
-            
-            <!-- Estilos adicionais -->
-            <style>
-              .table-container {
-                max-height: 400px;
-                overflow-y: auto;
-              }
-              .table th, .table td {
-                padding: 0.75rem;
-                text-align: left;
-                border-bottom: 1px solid #e5e7eb;
-              }
-              .table th {
-                background-color: #f3f4f6;
-                position: sticky;
-                top: 0;
-                z-index: 10;
-              }
-              .table-container {
-                max-height: 400px;
-                overflow-y: auto;
-                margin-top: 1rem;
-              }
-              .table th, .table td {
-                padding: 0.75rem;
-                text-align: left;
-                border-bottom: 1px solid #e5e7eb;
-              }
-              .table th {
-                background-color: #f3f4f6;
-                position: sticky;
-                top: 0;
-                z-index: 10;
-              }
-              .field.is-horizontal.is-spaced .field-body .field {
-                margin-bottom: 0.75rem;
-              }
-              .modal-card-body {
-                max-height: 70vh;
-                overflow-y: auto;
-              }
-              .box#comprovanteContainer {
-                text-align: center;
-}
-            </style>
-
-  <footer class="footer">
-    <div class="container-fluid">
-      <div class="level">
-        <div class="level-left">
-          <div class="level-item">
-            © 2025, M
-          </div>
-          <div class="level-item">
-              <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
-            </a>
-          </div>
-        </div>
-        <div class="level-right">
-          <div class="level-item">
-            <!-- <div class="logo">
-              <a href="https://justboil.me"><img src="img/justboil-logo.svg" alt="JustBoil.me"></a>
-            </div> -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </footer>
-</div>
-<!-- Scripts below are for demo only -->
-<script type="text/javascript" src="js/main.min.js"></script>
-
-<!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
-<link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
-</body>
+  </body>
 </html>

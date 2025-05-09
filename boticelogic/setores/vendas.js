@@ -1,4 +1,12 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+
+// Função para escapar caracteres especiais no Markdown
+const escapeMarkdown = (text) => {
+  if (!text) return text || 'Não informado';
+  return text.replace(/([*_`[\]])/g, '\\$1');
+};
 
 // Utility function for sending messages with auto-deletion
 const sendMessage = async (chatId, mensagem, bot, options = {}) => {
@@ -14,7 +22,7 @@ const sendMessage = async (chatId, mensagem, bot, options = {}) => {
       } catch (err) {
         console.error(`[ERROR] Failed to delete message ${sentMessage.message_id}:`, err.message);
       }
-    }, 30000);
+    }, 30000); // 30 seconds
     return sentMessage;
   } catch (err) {
     console.error(`[ERROR] Failed to send message to ${chatId}:`, err.message);
@@ -39,7 +47,7 @@ const showInitialMenu = async (chatId, nomeUsuario, bot) => {
   };
   return sendMessage(
     chatId,
-    `👋 *Bem-vindo às vendas, ${nomeUsuario || 'Usuário'}!* 😊\nEscolha uma opção:`,
+    `👋 *Bem-vindo às vendas, ${escapeMarkdown(nomeUsuario || 'Usuário')}!* 😊\nEscolha uma opção:`,
     bot,
     { reply_markup: keyboard }
   );
@@ -52,6 +60,7 @@ const handleCallbacks = async (query, sessao, bot, db) => {
 
   if (!chatId || !data) {
     console.error('[ERROR] Invalid callback query:', query);
+    await bot.answerCallbackQuery(query.id);
     return sendMessage(chatId, '⚠️ *Erro ao processar ação. Tente novamente.*', bot);
   }
 
@@ -59,6 +68,7 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     if (data === 'criar_venda') {
       sessao.carrinho = [];
       sessao.etapa = 'criar_venda';
+      sessao.lastUpdated = Date.now();
       const keyboard = {
         inline_keyboard: [
           [{ text: '➕ Adicionar itens', callback_data: 'adicionar_itens' }],
@@ -66,9 +76,10 @@ const handleCallbacks = async (query, sessao, bot, db) => {
           [{ text: '🛑 Sair', callback_data: 'sair' }],
         ],
       };
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
-        `🛒 *Criar nova venda, ${sessao.nome || 'Usuário'}!*\nO que deseja fazer?`,
+        `🛒 *Criar nova venda, ${escapeMarkdown(sessao.nome || 'Usuário')}!*\nO que deseja fazer?`,
         bot,
         { reply_markup: keyboard }
       );
@@ -76,15 +87,18 @@ const handleCallbacks = async (query, sessao, bot, db) => {
 
     if (data === 'adicionar_itens') {
       sessao.etapa = 'adicionar_itens';
+      sessao.lastUpdated = Date.now();
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
-        `➕ *Adicione itens ao carrinho.*\nExemplo: 1kg banana 1un coca-cola\nOu use: *ver carrinho*, *remover banana*`,
+        `➕ *Adicione itens ao carrinho.*\nExemplo: 1kg banana 1un coca-cola\nOu use: *ver carrinho*, *remover banana*, *produto*`,
         bot
       );
     }
 
     if (data === 'finalizar') {
       if (!sessao.carrinho?.length) {
+        await bot.answerCallbackQuery(query.id);
         return sendMessage(
           chatId,
           '⚠️ *O carrinho está vazio. Adicione itens antes de finalizar.*',
@@ -92,6 +106,8 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         );
       }
       sessao.etapa = 'finalizar';
+      sessao.lastUpdated = Date.now();
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
         `📍 *Por favor, envie o endereço de entrega ou a localização.*`,
@@ -102,14 +118,25 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     if (data === 'cancelar') {
       sessao.carrinho = [];
       sessao.etapa = null;
+      sessao.endereco = null;
+      sessao.metodo_pagamento = null;
+      sessao.comprovante_pagamento = null;
+      sessao.numero_cliente = null;
+      sessao.lastUpdated = Date.now();
+      await bot.answerCallbackQuery(query.id);
       return showInitialMenu(chatId, sessao.nome, bot);
     }
 
     if (data === 'pix') {
       sessao.metodo_pagamento = 'pix';
       sessao.etapa = 'comprovante';
+      sessao.lastUpdated = Date.now();
       const [laranja] = await db.query(`SELECT pix, qrcodex64 FROM laranja WHERE status = 1 LIMIT 1`);
       let mensagem = `📸 *Envie a imagem do comprovante do Pix.*\n`;
+      if (laranja.length && laranja[0].pix) {
+        mensagem += `Chave Pix: ${escapeMarkdown(laranja[0].pix)}\n`;
+      }
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(chatId, mensagem, bot);
     }
 
@@ -117,9 +144,11 @@ const handleCallbacks = async (query, sessao, bot, db) => {
       sessao.metodo_pagamento = 'dinheiro';
       sessao.comprovante_pagamento = 'Sem comprovante';
       sessao.etapa = 'numero_cliente';
+      sessao.lastUpdated = Date.now();
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
-        `📞 *Digite o número do cliente.*\nExemplo: 5511999999999`,
+        `📞 *Digite o número do cliente.*\nExemplo: +5511999999999 ou 5511999999999`,
         bot
       );
     }
@@ -127,27 +156,36 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     if (data === 'dinheiro_pix') {
       sessao.metodo_pagamento = 'dinheiro_pix';
       sessao.etapa = 'comprovante';
+      sessao.lastUpdated = Date.now();
       const [laranja] = await db.query(`SELECT pix, qrcodex64 FROM laranja WHERE status = 1 LIMIT 1`);
       let mensagem = `📸 *Envie a imagem do comprovante do Pix.*\n`;
+      if (laranja.length && laranja[0].pix) {
+        mensagem += `Chave Pix: ${escapeMarkdown(laranja[0].pix)}\n`;
+      }
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(chatId, mensagem, bot);
     }
 
     if (data === 'confirmar_pedido') {
       if (!sessao.numero_cliente) {
+        await bot.answerCallbackQuery(query.id);
         return sendMessage(
           chatId,
           '⚠️ *Por favor, envie o número do cliente antes de confirmar.*',
           bot
         );
       }
-
+    
       const carrinho = sessao.carrinho || [];
-      const valorTotal = carrinho.reduce((total, item) => total + (item.valor_total || 0), 0);
-
+      const valorTotal = carrinho.reduce((total, item) => {
+        const valor = parseFloat(item.valor_total);
+        return total + (isNaN(valor) ? 0 : valor);
+      }, 0);
+    
       const connection = await db.getConnection();
       try {
         await connection.beginTransaction();
-
+    
         // Validate all products in the cart
         const productNames = carrinho.map(item => item.nome.trim().toLowerCase());
         const [estoque] = await connection.query(
@@ -156,29 +194,34 @@ const handleCallbacks = async (query, sessao, bot, db) => {
            WHERE LOWER(nome) IN (${productNames.map(() => '?').join(',')})`,
           productNames
         );
-
+    
         for (const item of carrinho) {
           const estoqueItem = estoque.find(e => e.nome.toLowerCase() === item.nome.toLowerCase());
           if (!estoqueItem) {
             throw new Error(`Produto ${item.nome} não encontrado no estoque.`);
           }
           const quantidade = parseFloat(item.quantidade.toString().replace(/[^0-9.]/g, '')) || 0;
+          const valorUnitario = parseFloat(estoqueItem.valor_unitario);
+          if (isNaN(valorUnitario)) {
+            throw new Error(`Valor unitário inválido para ${item.nome}.`);
+          }
           if (estoqueItem.quantidade < quantidade) {
             throw new Error(
               `Estoque insuficiente para ${item.nome}. Disponível: ${estoqueItem.quantidade}, solicitado: ${quantidade}`
             );
           }
         }
-
+    
         // Save sale in vendas table
         const [result] = await connection.query(
-          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total, endereco, recebido, status, data, vendedor_id)
-           VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)`,
+          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total, endereco, valor_dinheiro, recebido, status, data, vendedor_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
           [
             sessao.numero_cliente || 'Não informado',
             sessao.metodo_pagamento || 'Não informado',
             valorTotal || 0,
             sessao.endereco || 'Não informado',
+            sessao.metodo_pagamento === 'dinheiro_pix' ? sessao.valor_dinheiro || 0 : null,
             0,
             'novo',
             sessao.usuario_id || null,
@@ -186,7 +229,7 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         );
         const vendaId = result.insertId;
         console.log(`[DEBUG] Venda salva com ID: ${vendaId}`);
-
+    
         // Save order in pedidos_diarios table
         const [pedidoResult] = await connection.query(
           `INSERT INTO pedidos_diarios (cliente_numero, status, endereco, recebido, venda_id)
@@ -201,7 +244,7 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         );
         const pedidoId = pedidoResult.insertId;
         console.log(`[DEBUG] Pedido diário salvo com ID: ${pedidoId}`);
-
+    
         // Save order items in pedido_itens table
         const itemQueries = carrinho.map(item => {
           const quantidade = parseFloat(item.quantidade.toString().replace(/[^0-9.]/g, '')) || 0;
@@ -213,7 +256,7 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         });
         await Promise.all(itemQueries);
         console.log(`[DEBUG] Itens adicionados ao pedido: ${carrinho.length} itens`);
-
+    
         // Update stock
         const stockQueries = carrinho.map(item => {
           const quantidade = parseFloat(item.quantidade.toString().replace(/[^0-9.]/g, '')) || 0;
@@ -225,20 +268,23 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         });
         await Promise.all(stockQueries);
         console.log(`[DEBUG] Estoque atualizado para ${carrinho.length} produtos`);
-
+    
         // Save payment receipt
         if (sessao.comprovante_pagamento && sessao.comprovante_pagamento !== 'Sem comprovante') {
           const buffer = Buffer.from(sessao.comprovante_pagamento, 'base64');
+          if (buffer.length > 10 * 1024 * 1024) {
+            throw new Error('Imagem do comprovante muito grande.');
+          }
           await connection.query(
             `UPDATE vendas SET comprovante = ? WHERE id = ?`,
             [buffer, vendaId]
           );
           console.log(`[DEBUG] Comprovante salvo para venda ID: ${vendaId}`);
         }
-
+    
         await connection.commit();
         console.log(`[DEBUG] Transação concluída com sucesso.`);
-
+    
         // Clear session
         sessao.carrinho = [];
         sessao.etapa = null;
@@ -246,12 +292,16 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         sessao.metodo_pagamento = null;
         sessao.comprovante_pagamento = null;
         sessao.numero_cliente = null;
-
+        sessao.valor_dinheiro = null;
+        sessao.lastUpdated = Date.now();
+    
+        await bot.answerCallbackQuery(query.id);
         await sendMessage(chatId, `✅ *Venda finalizada com sucesso! Pedido registrado.*`, bot);
         return showInitialMenu(chatId, sessao.nome, bot);
       } catch (err) {
         await connection.rollback();
         console.error(`[ERROR] Erro ao finalizar pedido:`, err.message);
+        await bot.answerCallbackQuery(query.id);
         return sendMessage(
           chatId,
           `⚠️ *Erro ao finalizar venda: ${err.message}. Tente novamente.*`,
@@ -276,51 +326,77 @@ const handleCallbacks = async (query, sessao, bot, db) => {
             [categoria.id]
           );
           if (produtos && produtos.length > 0) {
-            mensagem += `*${categoria.nome.toUpperCase()}*\n`;
+            mensagem += `*${escapeMarkdown(categoria.nome.toUpperCase())}*\n`;
             produtos.forEach(produto => {
-              mensagem += `- ${produto.nome} (${produto.medida}): ${produto.quantidade} disponíveis, R$${produto.valor_unitario.toFixed(2)}/${produto.medida}\n`;
+              const valorUnitario = parseFloat(produto.valor_unitario);
+              const valorFormatado = isNaN(valorUnitario) ? 'Indisponível' : `R$${valorUnitario.toFixed(2)}`;
+              mensagem += `- ${escapeMarkdown(produto.nome)} (${produto.medida}): ${produto.quantidade} disponíveis, ${valorFormatado}/${produto.medida}\n`;
             });
             mensagem += '\n';
           }
         }
       }
-      return sendMessage(chatId, mensagem || '⚠️ *Nenhum produto disponível no momento.*', bot);
+      await bot.answerCallbackQuery(query.id);
+      await sendMessage(chatId, mensagem || '⚠️ *Nenhum produto disponível no momento.*', bot);
+      sessao.etapa = null;
+      return showInitialMenu(chatId, sessao.nome, bot);
     }
 
     if (data === 'laranja') {
       const [laranja] = await db.query(`SELECT pix, qrcodex64 FROM laranja WHERE status = 1 LIMIT 1`);
-      if (!laranja || !laranja.length) {
+      if (!laranja.length) {
+        await bot.answerCallbackQuery(query.id);
         return sendMessage(chatId, '⚠️ *Nenhuma informação de Pix disponível.*', bot);
       }
       const { pix, qrcodex64 } = laranja[0];
+      await bot.answerCallbackQuery(query.id);
       if (qrcodex64) {
         try {
           const buffer = Buffer.from(qrcodex64, 'base64');
           await bot.sendPhoto(chatId, buffer, {
-            caption: `🟠 *Pix para pagamento:*\n${pix}\n\nUse o QR Code acima ou copie o código Pix.`,
+            caption: `🟠 *Pix para pagamento:*\n${escapeMarkdown(pix)}\n\nUse o QR Code acima ou copie o código Pix.`,
           });
         } catch (err) {
           console.error(`[ERROR] Erro ao enviar QR Code:`, err.message);
-          await sendMessage(chatId, `🟠 *Pix: ${pix}*\n⚠️ *Erro ao exibir QR Code.*`, bot);
+          await sendMessage(chatId, `🟠 *Pix: ${escapeMarkdown(pix)}*\n⚠️ *Erro ao exibir QR Code.*`, bot);
         }
       } else {
-        await sendMessage(chatId, `🟠 *Pix: ${pix}*`, bot);
+        await sendMessage(chatId, `🟠 *Pix: ${escapeMarkdown(pix)}*`, bot);
       }
-      return;
+      sessao.etapa = null;
+      return showInitialMenu(chatId, sessao.nome, bot);
     }
 
     if (data === 'info') {
       sessao.etapa = 'info';
+      sessao.lastUpdated = Date.now();
+      await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
-        `ℹ️ *Digite o nome do produto para consultar.*\nExemplo: info coca-cola`,
+        `ℹ️ *Digite o nome do produto para consultar.*\nExemplo: coca-cola`,
         bot
       );
     }
 
+    if (data === 'sair') {
+      sessao.carrinho = [];
+      sessao.etapa = null;
+      sessao.setor = null;
+      sessao.autenticado = false;
+      sessao.lastUpdated = Date.now();
+      await bot.answerCallbackQuery(query.id);
+      await sendMessage(
+        chatId,
+        '🛑 *Você saiu do setor Vendas.*\nPara começar, envie *oi* ou sua senha pessoal.',
+        bot
+      );
+    }
+
+    await bot.answerCallbackQuery(query.id);
     return sendMessage(chatId, '⚠️ *Ação inválida. Tente novamente.*', bot);
   } catch (err) {
     console.error(`[ERROR] Erro ao processar callback ${data}:`, err.message);
+    await bot.answerCallbackQuery(query.id);
     return sendMessage(chatId, '⚠️ *Erro ao processar ação. Tente novamente.*', bot);
   }
 };
@@ -329,30 +405,87 @@ const handleCallbacks = async (query, sessao, bot, db) => {
 const handleSales = async (texto, msg, sessao, db, bot) => {
   const chatId = msg.chat.id.toString();
 
+  // Timeout check
+  if (sessao.etapa && Date.now() - sessao.lastUpdated > 5 * 60 * 1000) {
+    sessao.carrinho = [];
+    sessao.etapa = null;
+    sessao.endereco = null;
+    sessao.metodo_pagamento = null;
+    sessao.comprovante_pagamento = null;
+    sessao.numero_cliente = null;
+    sessao.lastUpdated = Date.now();
+    await sendMessage(
+      chatId,
+      '🕒 *Sessão expirada. O fluxo foi reiniciado.*\nEscolha uma opção:',
+      bot
+    );
+    return showInitialMenu(chatId, sessao.nome, bot);
+  }
+
   if (texto.toLowerCase() === 'sair') {
     sessao.carrinho = [];
     sessao.etapa = null;
     sessao.setor = null;
     sessao.autenticado = false;
-    return sendMessage(
+    sessao.lastUpdated = Date.now();
+    await sendMessage(
       chatId,
       '🛑 *Você saiu do setor Vendas.*\nPara começar, envie *oi* ou sua senha pessoal.',
       bot
     );
+    return showInitialMenu(chatId, sessao.nome, bot);
+  }
+
+  if (texto.toLowerCase() === 'produto') {
+    const [categorias] = await db.query(`SELECT id, nome FROM categorias_estoque`);
+    let mensagem = '📋 *Lista de produtos por categoria:*\n\n';
+    if (!categorias || categorias.length === 0) {
+      mensagem += '⚠️ *Nenhuma categoria disponível no momento.*';
+    } else {
+      for (const categoria of categorias) {
+        const [produtos] = await db.query(
+          `SELECT nome, medida, quantidade, valor_unitario
+           FROM estoque
+           WHERE categoria_id = ? AND quantidade > 0`,
+          [categoria.id]
+        );
+        if (produtos && produtos.length > 0) {
+          mensagem += `*${escapeMarkdown(categoria.nome.toUpperCase())}*\n`;
+          produtos.forEach(produto => {
+            const valorUnitario = parseFloat(produto.valor_unitario);
+            const valorFormatado = isNaN(valorUnitario) ? 'Indisponível' : `R$${valorUnitario.toFixed(2)}`;
+            mensagem += `- ${escapeMarkdown(produto.nome)} (${produto.medida}): ${produto.quantidade} disponíveis, ${valorFormatado}/${produto.medida}\n`;
+          });
+          mensagem += '\n';
+        }
+      }
+    }
+    await sendMessage(chatId, mensagem || '⚠️ *Nenhum produto disponível no momento.*', bot);
+    sessao.etapa = null;
+    sessao.lastUpdated = Date.now();
+    return showInitialMenu(chatId, sessao.nome, bot);
   }
 
   if (sessao.etapa === 'adicionar_itens') {
     if (texto.toLowerCase() === 'ver carrinho') {
       if (!sessao.carrinho?.length) {
-        return sendMessage(chatId, '🛒 *O carrinho está vazio.*', bot);
+        await sendMessage(chatId, '🛒 *O carrinho está vazio.*', bot);
+        sessao.etapa = null;
+        sessao.lastUpdated = Date.now();
+        return showInitialMenu(chatId, sessao.nome, bot);
       }
       let mensagem = '🛒 *Seu carrinho:*\n\n';
       let valorTotal = 0;
       sessao.carrinho.forEach(item => {
-        mensagem += `- ${item.quantidade} ${item.nome}: R$${item.valor_total.toFixed(2)}\n`;
-        valorTotal += item.valor_total;
+        const valorTotalItem = parseFloat(item.valor_total);
+        const valorFormatado = isNaN(valorTotalItem) ? 'Indisponível' : `R$${valorTotalItem.toFixed(2)}`;
+        mensagem += `- ${escapeMarkdown(item.quantidade)} ${escapeMarkdown(item.nome)}: ${valorFormatado}\n`;
+        if (!isNaN(valorTotalItem)) {
+          valorTotal += valorTotalItem;
+        }
       });
-      mensagem += `\n*Valor total:* R$${valorTotal.toFixed(2)}`;
+      const valorTotalFormatado = isNaN(valorTotal) ? 'Indisponível' : `R$${valorTotal.toFixed(2)}`;
+      mensagem += `\n*Valor total:* ${valorTotalFormatado}`;
       const keyboard = {
         inline_keyboard: [
           [{ text: '➕ Adicionar mais itens', callback_data: 'adicionar_itens' }],
@@ -360,31 +493,45 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
           [{ text: '🛑 Cancelar', callback_data: 'cancelar' }],
         ],
       };
-      return sendMessage(chatId, mensagem, bot, { reply_markup: keyboard });
+      await sendMessage(chatId, mensagem, bot, { reply_markup: keyboard });
+      sessao.lastUpdated = Date.now();
+      return;
     }
 
     if (texto.toLowerCase().startsWith('remover ')) {
       const produto = texto.slice(8).trim().toLowerCase();
       const index = sessao.carrinho.findIndex(item => item.nome.toLowerCase() === produto);
       if (index === -1) {
-        return sendMessage(chatId, `⚠️ *Produto ${produto} não encontrado no carrinho.*`, bot);
+        await sendMessage(chatId, `⚠️ *Produto ${escapeMarkdown(produto)} não encontrado no carrinho.*`, bot);
+        sessao.etapa = null;
+        sessao.lastUpdated = Date.now();
+        return showInitialMenu(chatId, sessao.nome, bot);
       }
       sessao.carrinho.splice(index, 1);
-      return sendMessage(chatId, `🗑️ *${produto} removido do carrinho.*`, bot);
+      sessao.lastUpdated = Date.now();
+      await sendMessage(chatId, `🗑️ *${escapeMarkdown(produto)} removido do carrinho.*`, bot);
+      sessao.etapa = null;
+      return showInitialMenu(chatId, sessao.nome, bot);
     }
 
-    const itens = texto.split(/\s+/);
+    const itens = texto.trim().split(/\s+/);
+    if (itens.length < 2 || itens.length % 2 !== 0) {
+      await sendMessage(
+        chatId,
+        `⚠️ *Formato inválido.* Use: 1kg banana 1un coca-cola`,
+        bot
+      );
+      sessao.lastUpdated = Date.now();
+      return;
+    }
+
     let mensagem = '';
     for (let i = 0; i < itens.length; i += 2) {
       const quantidadeStr = itens[i];
-      const nome = itens[i + 1]?.toLowerCase();
-      if (!nome || !quantidadeStr) {
-        mensagem += `⚠️ Formato inválido para "${quantidadeStr} ${nome || ''}". Use: 1kg banana\n`;
-        continue;
-      }
+      const nome = itens[i + 1].toLowerCase();
       const quantidade = parseFloat(quantidadeStr.replace(/[^0-9.]/g, ''));
       if (isNaN(quantidade) || quantidade <= 0) {
-        mensagem += `⚠️ Quantidade inválida para "${nome}".\n`;
+        mensagem += `⚠️ Quantidade inválida para "${escapeMarkdown(nome)}".\n`;
         continue;
       }
       const [produtos] = await db.query(
@@ -394,19 +541,29 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
         [nome, quantidade]
       );
       if (produtos.length === 0) {
-        mensagem += `⚠️ Produto ${nome} não encontrado ou estoque insuficiente.\n`;
+        const [estoque] = await db.query(
+          `SELECT quantidade FROM estoque WHERE LOWER(nome) = ?`,
+          [nome]
+        );
+        const disponivel = estoque.length > 0 ? estoque[0].quantidade : 0;
+        mensagem += `⚠️ Produto ${escapeMarkdown(nome)} não encontrado ou estoque insuficiente (disponível: ${disponivel}).\n`;
         continue;
       }
       const produto = produtos[0];
-      const valorTotal = quantidade * produto.valor_unitario;
+      const valorUnitario = parseFloat(produto.valor_unitario);
+      if (isNaN(valorUnitario)) {
+        mensagem += `⚠️ Valor unitário inválido para "${escapeMarkdown(nome)}".\n`;
+        continue;
+      }
+      const valorTotal = quantidade * valorUnitario;
       sessao.carrinho.push({
         id: produto.id,
         nome: produto.nome,
         quantidade: `${quantidade}${produto.medida}`,
-        valor_unitario: produto.valor_unitario,
+        valor_unitario: valorUnitario,
         valor_total: valorTotal,
       });
-      mensagem += `✅ ${quantidade}${produto.medida} ${produto.nome} adicionado ao carrinho.\n`;
+      mensagem += `✅ ${quantidade}${produto.medida} ${escapeMarkdown(produto.nome)} adicionado ao carrinho.\n`;
     }
     const keyboard = {
       inline_keyboard: [
@@ -415,21 +572,29 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
         [{ text: '🛑 Cancelar', callback_data: 'cancelar' }],
       ],
     };
-    return sendMessage(
+    await sendMessage(
       chatId,
       mensagem || '⚠️ *Nenhum item válido adicionado.*',
       bot,
       { reply_markup: keyboard }
     );
+    sessao.lastUpdated = Date.now();
+    return;
   }
 
   if (sessao.etapa === 'finalizar') {
     if (msg.location) {
       sessao.endereco = `Localização: ${msg.location.latitude}, ${msg.location.longitude}`;
     } else {
-      sessao.endereco = texto;
+      if (!texto.trim()) {
+        await sendMessage(chatId, `⚠️ *Por favor, envie um endereço válido ou uma localização.*`, bot);
+        sessao.lastUpdated = Date.now();
+        return;
+      }
+      sessao.endereco = escapeMarkdown(texto);
     }
     sessao.etapa = 'metodo_pagamento';
+    sessao.lastUpdated = Date.now();
     const keyboard = {
       inline_keyboard: [
         [{ text: '💸 Pix', callback_data: 'pix' }],
@@ -438,36 +603,37 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
         [{ text: '🛑 Cancelar', callback_data: 'cancelar' }],
       ],
     };
-    return sendMessage(
+    await sendMessage(
       chatId,
       `💳 *Escolha o método de pagamento:*`,
       bot,
       { reply_markup: keyboard }
     );
+    return;
   }
 
   if (sessao.etapa === 'comprovante') {
     if (texto && texto.toLowerCase() === 'sem comprovante') {
       sessao.comprovante_pagamento = 'Sem comprovante';
-      sessao.etapa = 'numero_cliente';
-      return sendMessage(
-        chatId,
-        `📞 *Digite o número do cliente.*\nExemplo: 5511999999999`,
-        bot
-      );
+      sessao.etapa = sessao.metodo_pagamento === 'dinheiro_pix' ? 'valor_dinheiro' : 'numero_cliente';
+      sessao.lastUpdated = Date.now();
+      const mensagem = sessao.metodo_pagamento === 'dinheiro_pix'
+        ? `💵 *Digite o valor a ser pago em dinheiro.*\nExemplo: 50.00`
+        : `📞 *Digite o número do cliente.*\nExemplo: +5511999999999 ou 5511999999999`;
+      await sendMessage(chatId, mensagem, bot);
+      return;
     }
-    // Processar imagem se enviada
     if (msg.photo && msg.photo.length > 0) {
-      const photo = msg.photo[msg.photo.length - 1]; // Última versão (maior resolução)
+      const photo = msg.photo[msg.photo.length - 1];
       try {
         const file = await bot.getFile(photo.file_id);
         const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${file.file_path}`;
-        const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
+        const response = await axios.get(fileUrl, { responseType: 'arraybuffer', timeout: 10000 });
         const imageBuffer = Buffer.from(response.data);
-
-        // Salvar a imagem no sistema de arquivos
-        const fs = require('fs');
-        const path = require('path');
+        if (imageBuffer.length > 10 * 1024 * 1024) {
+          throw new Error('Imagem muito grande (máximo 10MB).');
+        }
+  
         const saveDir = './comprovantes';
         if (!fs.existsSync(saveDir)) {
           fs.mkdirSync(saveDir, { recursive: true });
@@ -476,41 +642,70 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
         const filePath = path.join(saveDir, fileName);
         fs.writeFileSync(filePath, imageBuffer);
         console.log(`[DEBUG] Imagem salva em: ${filePath}`);
-
-        // Converter para base64 e armazenar na sessão
+  
         sessao.comprovante_pagamento = imageBuffer.toString('base64');
-        sessao.etapa = 'numero_cliente';
-        return sendMessage(
-          chatId,
-          `📞 *Digite o número do cliente.*\nExemplo: 5511999999999`,
-          bot
-        );
+        sessao.etapa = sessao.metodo_pagamento === 'dinheiro_pix' ? 'valor_dinheiro' : 'numero_cliente';
+        sessao.lastUpdated = Date.now();
+        const mensagem = sessao.metodo_pagamento === 'dinheiro_pix'
+          ? `💵 *Digite o valor a ser pago em dinheiro.*\nExemplo: 50.00`
+          : `📞 *Digite o número do cliente.*\nExemplo: +5511999999999 ou 5511999999999`;
+        await sendMessage(chatId, mensagem, bot);
+        return;
       } catch (err) {
         console.error(`[ERROR] Erro ao processar imagem do comprovante:`, err.message);
-        return sendMessage(
+        await sendMessage(
           chatId,
-          `⚠️ *Erro ao processar a imagem. Tente novamente ou envie "sem comprovante".*`,
+          `⚠️ *Erro ao processar a imagem: ${err.message}. Tente novamente ou envie "sem comprovante".*`,
           bot
         );
+        sessao.lastUpdated = Date.now();
+        return;
       }
     }
-    return sendMessage(
+    await sendMessage(
       chatId,
       `📸 *Envie a imagem do comprovante ou digite "sem comprovante".*`,
       bot
     );
+    sessao.lastUpdated = Date.now();
+    return;
+  }
+  
+  if (sessao.etapa === 'valor_dinheiro') {
+    const valorDinheiro = parseFloat(texto.replace(/[^0-9.]/g, ''));
+    if (isNaN(valorDinheiro) || valorDinheiro < 0) {
+      await sendMessage(
+        chatId,
+        `⚠️ *Valor inválido. Digite um valor válido em dinheiro.*\nExemplo: 50.00`,
+        bot
+      );
+      sessao.lastUpdated = Date.now();
+      return;
+    }
+    sessao.valor_dinheiro = valorDinheiro;
+    sessao.etapa = 'numero_cliente';
+    sessao.lastUpdated = Date.now();
+    await sendMessage(
+      chatId,
+      `📞 *Digite o número do cliente.*\nExemplo: +5511999999999 ou 5511999999999`,
+      bot
+    );
+    return;
   }
 
   if (sessao.etapa === 'numero_cliente') {
     const numero = texto.replace(/\D/g, '');
-    if (numero.length < 10) {
-      return sendMessage(
+    if (numero.length < 10 || numero.length > 15) {
+      await sendMessage(
         chatId,
-        `⚠️ *Número inválido. Digite um número válido.*\nExemplo: 5511999999999`,
+        `⚠️ *Número inválido. Digite um número válido com 10 a 15 dígitos.*\nExemplo: +5511999999999 ou 5511999999999`,
         bot
       );
+      sessao.lastUpdated = Date.now();
+      return;
     }
-    sessao.numero_cliente = numero;
+    sessao.numero_cliente = escapeMarkdown(numero);
+    sessao.lastUpdated = Date.now();
     const keyboard = {
       inline_keyboard: [
         [{ text: '✅ Confirmar pedido', callback_data: 'confirmar_pedido' }],
@@ -520,15 +715,24 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
     let mensagem = `📋 *Resumo do pedido:*\n\n`;
     let valorTotal = 0;
     sessao.carrinho.forEach(item => {
-      mensagem += `- ${item.quantidade} ${item.nome}: R$${item.valor_total.toFixed(2)}\n`;
-      valorTotal += item.valor_total;
+      const valorTotalItem = parseFloat(item.valor_total);
+      const valorFormatado = isNaN(valorTotalItem) ? 'Indisponível' : `R$${valorTotalItem.toFixed(2)}`;
+      mensagem += `- ${escapeMarkdown(item.quantidade)} ${escapeMarkdown(item.nome)}: ${valorFormatado}\n`;
+      if (!isNaN(valorTotalItem)) {
+        valorTotal += valorTotalItem;
+      }
     });
-    mensagem += `\n*Valor total:* R$${valorTotal.toFixed(2)}\n`;
-    mensagem += `*Endereço:* ${sessao.endereco || 'Não informado'}\n`;
-    mensagem += `*Pagamento:* ${sessao.metodo_pagamento || 'Não informado'}\n`;
-    mensagem += `*Número do cliente:* ${sessao.numero_cliente}\n`;
+    const valorTotalFormatado = isNaN(valorTotal) ? 'Indisponível' : `R$${valorTotal.toFixed(2)}`;
+    mensagem += `\n*Valor total:* ${valorTotalFormatado}\n`;
+    mensagem += `*Endereço:* ${escapeMarkdown(sessao.endereco || 'Não informado')}\n`;
+    mensagem += `*Pagamento:* ${escapeMarkdown(sessao.metodo_pagamento || 'Não informado')}\n`;
+    if (sessao.metodo_pagamento === 'dinheiro_pix' && sessao.valor_dinheiro !== undefined) {
+      mensagem += `*Valor em dinheiro:* R$${sessao.valor_dinheiro.toFixed(2)}\n`;
+    }
+    mensagem += `*Número do cliente:* ${escapeMarkdown(sessao.numero_cliente)}\n`;
     mensagem += `*Comprovante:* ${sessao.comprovante_pagamento ? 'Enviado' : 'Sem comprovante'}`;
-    return sendMessage(chatId, mensagem, bot, { reply_markup: keyboard });
+    await sendMessage(chatId, mensagem, bot, { reply_markup: keyboard });
+    return;
   }
 
   if (sessao.etapa === 'info') {
@@ -540,21 +744,31 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
       [nomeProduto]
     );
     if (produtos.length === 0) {
-      return sendMessage(
+      await sendMessage(
         chatId,
-        `⚠️ *Produto ${nomeProduto} não encontrado.*`,
+        `⚠️ *Produto ${escapeMarkdown(nomeProduto)} não encontrado.*`,
         bot
       );
+      sessao.etapa = null;
+      sessao.lastUpdated = Date.now();
+      return showInitialMenu(chatId, sessao.nome, bot);
     }
     const produto = produtos[0];
+    const valorUnitario = parseFloat(produto.valor_unitario);
+    const valorFormatado = isNaN(valorUnitario) ? 'Indisponível' : `R$${valorUnitario.toFixed(2)}`;
     const mensagem = `ℹ️ *Informações do produto:*\n\n` +
-      `- *Nome:* ${produto.nome}\n` +
+      `- *Nome:* ${escapeMarkdown(produto.nome)}\n` +
       `- *Medida:* ${produto.medida}\n` +
       `- *Quantidade disponível:* ${produto.quantidade}\n` +
-      `- *Valor unitário:* R$${produto.valor_unitario.toFixed(2)}/${produto.medida}`;
-    return sendMessage(chatId, mensagem, bot);
+      `- *Valor unitário:* ${valorFormatado}/${produto.medida}`;
+    await sendMessage(chatId, mensagem, bot);
+    sessao.etapa = null;
+    sessao.lastUpdated = Date.now();
+    return showInitialMenu(chatId, sessao.nome, bot);
   }
 
+  sessao.etapa = null;
+  sessao.lastUpdated = Date.now();
   return showInitialMenu(chatId, sessao.nome, bot);
 };
 
@@ -583,15 +797,17 @@ module.exports = async (texto, msg, sessao, db, bot) => {
 
   // Inicializar texto como string vazia se não definido
   texto = texto || msg.text || '';
-  // Permitir tratar imagem mesmo se texto for undefined
   if (temImagem || typeof texto === 'string') {
     return handleSales(texto, msg, sessao, db, bot);
   }
 
   console.log('[DEBUG] Mensagem inválida recebida:', msg);
-  return sendMessage(
+  await sendMessage(
     msg.chat.id.toString(),
     '⚠️ *Mensagem não reconhecida. Envie texto ou imagem do comprovante.*',
     bot
   );
+  sessao.etapa = null;
+  sessao.lastUpdated = Date.now();
+  return showInitialMenu(msg.chat.id.toString(), sessao.nome, bot);
 };

@@ -14,6 +14,7 @@ const db = mysql.createPool({
 app.use(express.static('.'));
 app.use(express.json());
 
+// Rota para listar pedidos diários
 app.get('/pedidos_diarios', async (req, res) => {
   try {
     const [pedidos] = await db.query(`
@@ -37,6 +38,7 @@ app.get('/pedidos_diarios', async (req, res) => {
   }
 });
 
+// Rota para alterar status do pedido
 app.post('/alterar_status', async (req, res) => {
   const { id, statusAtual } = req.body;
   const validStatuses = ['novo', 'embalado', 'entrega', 'rua', 'finalizado', 'falha', 'incorreto'];
@@ -71,26 +73,6 @@ app.post('/alterar_status', async (req, res) => {
   } catch (err) {
     console.error("Erro ao alterar status:", err);
     res.status(500).json({ erro: 'Erro ao alterar status do pedido.' });
-  }
-});
-
-app.get('/resumo_diario', async (req, res) => {
-  try {
-    const [[resumo]] = await db.query(`
-      SELECT 
-        COUNT(v.id) AS total_vendas, 
-        SUM(v.valor_pago) AS total_valor
-      FROM vendas v
-      LEFT JOIN pedidos_diarios pd ON pd.venda_id = v.id
-      WHERE DATE(pd.data) = CURDATE()
-    `);
-    res.json({
-      total_vendas: resumo.total_vendas || 0,
-      total_valor: resumo.total_valor || 0
-    });
-  } catch (err) {
-    console.error("Erro ao buscar resumo:", err);
-    res.status(500).json({ erro: 'Erro ao buscar resumo' });
   }
 });
 
@@ -171,16 +153,35 @@ app.post('/login', async (req, res) => {
 
 app.get('/comprovante/:id', async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      SELECT v.comprovante 
-      FROM vendas v
-      JOIN pedidos_diarios pd ON pd.venda_id = v.id
-      WHERE pd.id = ?
-    `, [req.params.id]);
-    if (!rows.length || !rows[0].comprovante) return res.sendStatus(404);
-    res.set('Content-Type', 'image/png').send(rows[0].comprovante);
+    const [rows] = await db.query('SELECT comprovante FROM vendas WHERE id = ?', [req.params.id]);
+    if (rows.length > 0 && rows[0].comprovante) {
+      const base64 = Buffer.from(rows[0].comprovante).toString('base64');
+      res.json({ image: `data:image/png;base64,${base64}` });
+    } else {
+      res.status(404).send('Comprovante não encontrado');
+    }
   } catch (err) {
-    res.status(500).send('Erro ao carregar comprovante.');
+    console.error('Erro ao buscar comprovante:', err);
+    res.status(500).send('Erro ao buscar comprovante');
+  }
+});
+
+
+// Rota para listar categorias do estoque
+app.get('/api/estoque/categorias', async (req, res) => {
+  try {
+    const [categorias] = await db.query('SELECT id, nome FROM categorias_estoque ORDER BY nome');
+    if (categorias.length === 0) {
+      return res.status(404).json({ error: 'Nenhuma categoria encontrada' });
+    }
+    const formattedCategorias = categorias.map(cat => ({
+      id: cat.id,
+      nome: cat.nome.charAt(0).toUpperCase() + cat.nome.slice(1)
+    }));
+    res.json(formattedCategorias);
+  } catch (error) {
+    console.error('Erro ao buscar categorias:', error);
+    res.status(500).json({ error: 'Erro ao buscar categorias' });
   }
 });
 
