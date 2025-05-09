@@ -11,6 +11,24 @@
   <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
 </head>
 <body>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const usuario = localStorage.getItem('usuario');
+      const permissao = localStorage.getItem('permissao');
+  
+      // Verifica se o usuário e permissão estão armazenados no localStorage
+      if (!usuario || !permissao) {
+        alert('Você não está autenticado! Redirecionando para o login...');
+        window.location.href = '../login.html'; // Redireciona para a página de login
+      }
+  
+      // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
+      if (permissao !== 'admin') {
+        alert('Você não tem permissão para acessar essa área!');
+        window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
+      }
+    });
+  </script>
 <div id="app">
   <nav id="navbar-main" class="navbar is-fixed-top">
     <div class="navbar-brand">
@@ -43,6 +61,7 @@
         <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
         <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
         <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="despesas.html" class="has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
       </ul>
       <p class="menu-label">Logic Ice</p>
       <ul class="menu-list">

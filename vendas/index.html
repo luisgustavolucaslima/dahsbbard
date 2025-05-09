@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Painel do Gerente de Vendas</title>
+    <link rel="stylesheet" href="css/main.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+    <style>
+      :root {
+        --primary-color: #3273dc;
+        --secondary-color: #f5f5f5;
+        --text-color: #4a4a4a;
+      }
+      .table th, .table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .table th {
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .table-container {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-top: 1rem;
+      }
+      .modal-card-body {
+        padding: 2rem;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+      .loader {
+        border: 16px solid #f3f3f3;
+        border-top: 16px solid var(--primary-color);
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        animation: spin 2s linear infinite;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        display: none;
+      }
+      @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+      .button.is-primary {
+        background-color: var(--primary-color);
+      }
+      .field.is-grouped .control {
+        margin-right: 0.75rem;
+      }
+      .box#comprovanteContainer {
+        text-align: center;
+      }
+      .notification-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        max-width: 400px;
+      }
+      .notification {
+        margin-bottom: 10px;
+        opacity: 1;
+        transition: opacity 0.3s ease-in-out;
+      }
+      .notification.fade-out {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loader" class="loader"></div>
+    <div id="app">
+      <div id="notification-container" class="notification-container"></div>
+      <nav id="navbar-main" class="navbar is-fixed-top">
+        <div class="navbar-brand">
+          <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+            <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+          </a>
+        </div>
+        <div class="navbar-brand is-right">
+          <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+            <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+          </a>
+        </div>
+        <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+          <div class="navbar-end">
+            <a title="Log out" class="navbar-item is-desktop-icon-only">
+              <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+            </a>
+          </div>
+        </div>
+      </nav>
+      <aside class="aside is-placed-left is-expanded">
+        <div class="aside-tools">
+          <div class="aside-tools-label">
+            <span><b>Gerente de Vendas</b></span>
+          </div>
+        </div>
+        <div class="menu is-menu-main">
+          <p class="menu-label">Geral</p>
+          <ul class="menu-list">
+            <li><a href="index.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+            <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+          </ul>
+        </div>
+      </aside>
+      <section class="section is-title-bar">
+        <div class="level">
+          <div class="level-left">
+            <div class="level-item">
+              <ul>
+                <li>Gerente de Vendas</li>
+                <li>Dashboard</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="hero is-hero-bar">
+        <div class="hero-body">
+          <div class="level">
+            <div class="level-left">
+              <div class="level-item"><h1 class="title">Painel do Gerente de Vendas</h1></div>
+            </div>
+            <div class="level-right">
+              <div class="level-item">
+                <button id="refreshDashboardBtn" class="button is-primary">Atualizar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="section is-main-section">
+        <!-- Seção de Aprovação de Pagamentos -->
+        <div class="card mb-6">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="mdi mdi-approval"></i></span>
+              Pedidos Pendentes de Aprovação
+            </p>
+          </header>
+          <div class="card-content">
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                  <tr>
+                    <th>ID Pedido</th>
+                    <th>Cliente</th>
+                    <th>Valor Total</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="pedidosPendentesTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- Vendas Diárias (somente visualização) -->
+        <div class="card mb-6">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="mdi mdi-ballot"></i></span>
+              Vendas Diárias
+            </p>
+          </header>
+          <div class="card-content">
+            <div class="field is-grouped">
+              <p class="control is-expanded has-icons-left">
+                <input class="input" type="text" id="clienteNumero" placeholder="Número do Cliente">
+                <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
+              </p>
+              <p class="control is-expanded has-icons-left">
+                <input class="input" type="date" id="dataInicio" placeholder="Data Início">
+                <span class="icon is-small is-left"><i class="mdi mdi-calendar"></i></span>
+              </p>
+              <p class="control is-expanded has-icons-left">
+                <input class="input" type="date" id="dataFim" placeholder="Data Fim">
+                <span class="icon is-small is-left"><i class="mdi mdi-calendar"></i></span>
+              </p>
+              <p class="control">
+                <button id="filterVendasBtn" class="button is-primary">Filtrar</button>
+              </p>
+            </div>
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable is-bordered">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Valor Pago</th>
+                    <th>Forma de Pagamento</th>
+                    <th>Data</th>
+                    <th>Endereço</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="vendasTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer class="footer">
+        <div class="container-fluid">
+          <div class="level">
+            <div class="level-left">
+              <div class="level-item">© 2025, M</div>
+              <div class="level-item">
+                <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script type="text/javascript" src="js/main.min.js"></script>
+    <script>
+      // Funções de Notificação
+      function showNotification(message, type = 'info') {
+        const container = document.getElementById('notification-container');
+        const notification = document.createElement('div');
+        notification.className = `notification is-${type} is-light`;
+        notification.innerHTML = `
+          <button class="delete"></button>
+          ${message}
+        `;
+        container.appendChild(notification);
+        notification.querySelector('.delete').addEventListener('click', () => {
+          notification.classList.add('fade-out');
+          setTimeout(() => notification.remove(), 300);
+        });
+        setTimeout(() => {
+          notification.classList.add('fade-out');
+          setTimeout(() => notification.remove(), 300);
+        }, 5000);
+      }
+
+      // Formatação de Dados
+      function formatarData(data) {
+        const d = new Date(data);
+        return d.toLocaleString('pt-BR');
+      }
+
+      function formatarCliente(numero) {
+        return numero.replace('@c.us', '');
+      }
+
+      // Verificação de Permissões
+      document.addEventListener("DOMContentLoaded", () => {
+        const permissao = localStorage.getItem('permissao');
+        if (permissao !== 'vendas') {
+          showNotification('Você não tem permissão para acessar essa área!', 'danger');
+          setTimeout(() => { window.location.href = '../login.html'; }, 3000);
+          return;
+        }
+        atualizarPedidosPendentes();
+        atualizarVendas();
+      });
+
+      // Logout
+      document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+        localStorage.removeItem('usuario');
+        localStorage.removeItem('permissao');
+        window.location.href = '../login.html';
+      });
+
+      // Atualizar Pedidos Pendentes
+      async function atualizarPedidosPendentes() {
+        try {
+          const response = await fetch('/api/pedidos_pendentes');
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          const pedidos = await response.json();
+          const tbody = document.getElementById('pedidosPendentesTable');
+          tbody.innerHTML = '';
+          pedidos.forEach(pedido => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${pedido.id}</td>
+              <td>${formatarCliente(pedido.cliente_numero)}</td>
+              <td>R$ ${parseFloat(pedido.valor_total || 0).toFixed(2)}</td>
+              <td>
+                <button class="button is-small is-success" onclick="aprovarPedido(${pedido.id})">Aprovar</button>
+                <button class="button is-small is-danger" onclick="negarPedido(${pedido.id})">Negar</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+          if (pedidos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered">Nenhum pedido pendente</td></tr>';
+          }
+        } catch (error) {
+          showNotification('Erro ao carregar pedidos pendentes: ' + error.message, 'danger');
+        }
+      }
+
+      // Aprovar Pedido
+      async function aprovarPedido(id) {
+        try {
+          const response = await fetch('/api/atualizar_valido', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, valido: 1 })
+          });
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          showNotification('Pedido aprovado com sucesso!', 'success');
+          atualizarPedidosPendentes();
+        } catch (error) {
+          showNotification('Erro ao aprovar pedido: ' + error.message, 'danger');
+        }
+      }
+
+      // Negar Pedido
+      async function negarPedido(id) {
+        try {
+          const response = await fetch('/api/atualizar_valido', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, valido: 2 })
+          });
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          showNotification('Pedido negado com sucesso!', 'success');
+          atualizarPedidosPendentes();
+        } catch (error) {
+          showNotification('Erro ao negar pedido: ' + error.message, 'danger');
+        }
+      }
+
+      // Atualizar Vendas (somente visualização)
+      async function atualizarVendas(filtros = {}) {
+        document.getElementById('loader').style.display = 'block';
+        try {
+          const query = new URLSearchParams(filtros).toString();
+          const response = await fetch(`/api/vendas?${query}`);
+          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+          const vendas = await response.json();
+          const tbody = document.getElementById('vendasTable');
+          tbody.innerHTML = '';
+          vendas.forEach(venda => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${venda.id}</td>
+              <td>${formatarCliente(venda.cliente_numero)}</td>
+              <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
+              <td>${venda.forma_pagamento}</td>
+              <td>${formatarData(venda.data)}</td>
+              <td>${venda.endereco}</td>
+              <td>${venda.status}</td>
+            `;
+            tbody.appendChild(row);
+          });
+          if (vendas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
+          }
+        } catch (error) {
+          showNotification('Erro ao carregar vendas: ' + error.message, 'danger');
+        } finally {
+          document.getElementById('loader').style.display = 'none';
+        }
+      }
+
+      // Eventos
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('filterVendasBtn').addEventListener('click', (e) => {
+          e.preventDefault();
+          const filtros = {
+            cliente_numero: document.getElementById('clienteNumero').value,
+            data_inicio: document.getElementById('dataInicio').value,
+            data_fim: document.getElementById('dataFim').value,
+          };
+          atualizarVendas(filtros);
+        });
+
+        document.getElementById('refreshDashboardBtn').addEventListener('click', () => {
+          atualizarPedidosPendentes();
+          atualizarVendas();
+        });
+      });
+    </script>
+  </body>
+</html>

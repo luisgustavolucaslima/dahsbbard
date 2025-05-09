@@ -1,0 +1,4 @@
+[2025-05-07 12:42:08] Erro no callback: {
+  "code": "ETELEGRAM",
+  "message": "ETELEGRAM: 400 Bad Request: inline keyboard expected"
+}

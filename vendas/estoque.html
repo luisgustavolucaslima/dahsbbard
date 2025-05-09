@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estoque</title>
+  <link rel="stylesheet" href="css/main.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+</head>
+<body>
+  <div id="app">
+    <div id="notification-container" class="notification-container"></div>
+    <nav id="navbar-main" class="navbar is-fixed-top">
+      <div class="navbar-brand">
+        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+        </a>
+      </div>
+      <div class="navbar-brand is-right">
+        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+        </a>
+      </div>
+      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+        <div class="navbar-end">
+          <a title="Log out" class="navbar-item is-desktop-icon-only">
+            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+    <aside class="aside is-placed-left is-expanded">
+      <div class="aside-tools">
+        <div class="aside-tools-label">
+          <span><b>Gerente de Vendas</b></span>
+        </div>
+      </div>
+      <div class="menu is-menu-main">
+        <p class="menu-label">Geral</p>
+        <ul class="menu-list">
+          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+          <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+          <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        </ul>
+      </div>
+    </aside>
+    <section class="section is-title-bar">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item">
+            <ul><li>Gerente de Vendas</li><li>Estoque</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="hero is-hero-bar">
+      <div class="hero-body">
+        <div class="level">
+          <div class="level-left">
+            <div class="level-item"><h1 class="title">Estoque</h1></div>
+          </div>
+          <div class="level-right">
+            <div class="level-item">
+              <button id="refreshEstoqueBtn" class="button is-primary">Atualizar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="section is-main-section">
+      <div class="card mb-6">
+        <header class="card-header">
+          <p class="card-header-title">
+            <span class="icon"><i class="mdi mdi-warehouse"></i></span>
+            Gerenciamento de Estoque
+          </p>
+        </header>
+        <div class="card-content">
+          <div class="field is-horizontal is-spaced mb-4">
+            <div class="field-label is-normal">
+              <label class="label">Filtro</label>
+            </div>
+            <div class="field-body">
+              <div class="field mr-4">
+                <p class="control is-expanded has-icons-left">
+                  <input class="input" type="text" id="buscaProduto" placeholder="Nome do Produto">
+                  <span class="icon is-small is-left"><i class="mdi mdi-magnify"></i></span>
+                </p>
+              </div>
+              <div class="field">
+                <div class="control">
+                  <button id="filterEstoqueBtn" class="button is-primary">Filtrar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tabs is-boxed">
+            <ul id="estoqueTabs"></ul>
+          </div>
+          <div id="estoqueContent"></div>
+        </div>
+      </div>
+    </section>
+    <footer class="footer">
+      <div class="container-fluid">
+        <div class="level">
+          <div class="level-left">
+            <div class="level-item">© 2025, M</div>
+            <div class="level-item">
+              <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+  <script type="text/javascript" src="js/main.min.js"></script>
+  <script>
+    // Função para exibir notificações
+    function showNotification(message, type = 'is-danger') {
+      const container = document.getElementById('notification-container');
+      const notification = document.createElement('div');
+      notification.className = `notification ${type} is-light`;
+      notification.innerHTML = `
+        <button class="delete"></button>
+        ${message}
+      `;
+      container.appendChild(notification);
+      notification.querySelector('.delete').addEventListener('click', () => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+      });
+      setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+      }, 5000);
+    }
+
+    // Verificação de Permissões
+    document.addEventListener("DOMContentLoaded", () => {
+      const permissao = localStorage.getItem('permissao');
+      if (permissao !== 'vendas') {
+        showNotification('Você não tem permissão para acessar essa área!', 'is-danger');
+        setTimeout(() => { window.location.href = '../login.html'; }, 3000);
+        return;
+      }
+      carregarCategorias();
+    });
+
+    // Logout
+    document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+      localStorage.removeItem('usuario');
+      localStorage.removeItem('permissao');
+      window.location.href = '../login.html';
+    });
+
+    // Função para carregar categorias
+    async function carregarCategorias() {
+      try {
+        const response = await fetch('/api/estoque/categorias');
+        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+        const categorias = await response.json();
+        atualizarAbas(categorias);
+        atualizarEstoque();
+      } catch (error) {
+        showNotification('Erro ao carregar categorias: ' + error.message, 'is-danger');
+      }
+    }
+
+    // Função para atualizar abas
+    function atualizarAbas(categorias) {
+      const tabsUl = document.getElementById('estoqueTabs');
+      tabsUl.innerHTML = '';
+      categorias.forEach((cat, index) => {
+        const li = document.createElement('li');
+        li.className = index === 0 ? 'is-active' : '';
+        li.innerHTML = `<a onclick="mostrarAba('${cat.id}')">${cat.nome}</a>`;
+        tabsUl.appendChild(li);
+      });
+    }
+
+    // Função para atualizar estoque
+    async function atualizarEstoque(nome = '') {
+      try {
+        const query = nome ? `?nome=${encodeURIComponent(nome)}` : '';
+        const responseEstoque = await fetch(`/api/estoque${query}`);
+        if (!responseEstoque.ok) throw new Error(`Erro na resposta do servidor: ${responseEstoque.status}`);
+        const estoque = await responseEstoque.json();
+
+        const responseCats = await fetch('/api/estoque/categorias');
+        if (!responseCats.ok) throw new Error(`Erro na resposta do servidor: ${responseCats.status}`);
+        const categorias = await responseCats.json();
+
+        // Mapear categoria_id para nome
+        const categoriaMap = {};
+        categorias.forEach(cat => {
+          categoriaMap[cat.id] = cat.nome;
+        });
+
+        // Atualizar conteúdo
+        const contentDiv = document.getElementById('estoqueContent');
+        contentDiv.innerHTML = '';
+        categorias.forEach((cat, index) => {
+          const div = document.createElement('div');
+          div.id = `aba-${cat.id}`;
+          div.className = `tab-content ${index === 0 ? '' : 'is-hidden'}`;
+          div.innerHTML = `
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nome do Produto</th>
+                    <th>Quantidade</th>
+                    <th>Medida</th>
+                    <th>Valor Unitário</th>
+                    <th>Categoria</th>
+                  </tr>
+                </thead>
+                <tbody id="estoqueTable-${cat.id}"></tbody>
+              </table>
+            </div>
+          `;
+          contentDiv.appendChild(div);
+
+          // Preencher tabela
+          const tbody = document.getElementById(`estoqueTable-${cat.id}`);
+          const itens = estoque.filter(item => item.categoria_id == cat.id);
+          itens.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${item.id}</td>
+              <td>${item.nome}</td>
+              <td>${item.quantidade}</td>
+              <td>${item.medida || 'N/A'}</td>
+              <td>R$ ${parseFloat(item.valor_unitario || 0).toFixed(2)}</td>
+              <td>${categoriaMap[item.categoria_id] || 'N/A'}</td>
+            `;
+            tbody.appendChild(row);
+          });
+          if (itens.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="has-text-centered">Nenhum item encontrado para ${cat.nome}</td></tr>`;
+          }
+        });
+      } catch (error) {
+        showNotification('Erro ao carregar estoque: ' + error.message, 'is-danger');
+      }
+    }
+
+    // Função para mostrar aba selecionada
+    function mostrarAba(categoriaId) {
+      document.querySelectorAll('.tabs li').forEach(li => li.classList.remove('is-active'));
+      document.querySelector(`.tabs a[onclick="mostrarAba('${categoriaId}')"]`).parentElement.classList.add('is-active');
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.add('is-hidden'));
+      document.getElementById(`aba-${categoriaId}`).classList.remove('is-hidden');
+    }
+
+    // Eventos
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('filterEstoqueBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        const nome = document.getElementById('buscaProduto').value;
+        atualizarEstoque(nome);
+      });
+
+      document.getElementById('refreshEstoqueBtn').addEventListener('click', () => {
+        document.getElementById('buscaProduto').value = '';
+        atualizarEstoque();
+      });
+    });
+  </script>
+  <style>
+    .notification-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 400px;
+    }
+    .notification {
+      margin-bottom: 10px;
+      opacity: 1;
+      transition: opacity 0.3s ease-in-out;
+    }
+    .notification.fade-out {
+      opacity: 0;
+    }
+    .table-container {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .table th, .table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .table th {
+      background-color: #f3f4f6;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .tabs.is-boxed li.is-active a {
+      background-color: #3273dc;
+      color: #fff;
+      border-color: #3273dc;
+    }
+    .tab-content.is-hidden {
+      display: none;
+    }
+  </style>
+</body>
+</html>

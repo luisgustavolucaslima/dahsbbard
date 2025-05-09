@@ -1,59 +1,77 @@
 <!DOCTYPE html>
 <html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Vendas</title>
-  
-    <!-- Bulma is included -->
-    <link rel="stylesheet" href="css/main.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <!-- Fonts -->
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
-  </head>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entregas</title>
+  <link rel="stylesheet" href="css/main.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
 <body>
-  <div id="app">
-    <nav id="navbar-main" class="navbar is-fixed-top">
-      <div class="navbar-brand">
-        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
-          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const usuario = localStorage.getItem('usuario');
+      const permissao = localStorage.getItem('permissao');
+  
+      // Verifica se o usuário e permissão estão armazenados no localStorage
+      if (!usuario || !permissao) {
+        alert('Você não está autenticado! Redirecionando para o login...');
+        window.location.href = '../login.html'; // Redireciona para a página de login
+      }
+  
+      // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
+      if (permissao !== 'admin') {
+        alert('Você não tem permissão para acessar essa área!');
+        window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
+      }
+    });
+  </script>
+<div id="app">
+  <nav id="navbar-main" class="navbar is-fixed-top">
+    <div class="navbar-brand">
+      <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+        <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+      </a>
+    </div>
+    <div class="navbar-brand is-right">
+      <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+        <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+      </a>
+    </div>
+    <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+      <div class="navbar-end">
+        <a title="Log out" class="navbar-item is-desktop-icon-only">
+          <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
         </a>
       </div>
-      <div class="navbar-brand is-right">
-        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
-          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
-        </a>
+    </div>
+  </nav>
+  <aside class="aside is-placed-left is-expanded">
+    <div class="aside-tools">
+      <div class="aside-tools-label">
+        <span><b>Admin</b></span>
       </div>
-      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
-        <div class="navbar-end">
-          <a title="Log out" class="navbar-item is-desktop-icon-only">
-            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
-          </a>
-        </div>
-      </div>
-    </nav>
-    <aside class="aside is-placed-left is-expanded">
-      <div class="aside-tools">
-        <div class="aside-tools-label">
-          <span><b>Admin</b></span>
-        </div>
-      </div>
-      <div class="menu is-menu-main">
-        <p class="menu-label">Geral</p>
-        <ul class="menu-list">
-          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-          <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
-          <li><a href="estoque.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-        </ul>
-        <p class="menu-label">Logic Ice</p>
-        <ul class="menu-list">
-          <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
-          <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
-          <li><a href="entregas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
-        </ul>
-      </div>
+    </div>
+    <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="despesas.html" class="has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+      <ul class="menu-list">
+        <li><a href="producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+        <li><a href="entregas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
+      </ul>
+    </div>
   </aside>
   <section class="section is-title-bar">
     <div class="level">
@@ -61,7 +79,7 @@
         <div class="level-item">
           <ul>
             <li>Admin</li>
-            <li>Vendas</li>
+            <li>Entregas</li>
           </ul>
         </div>
       </div>
@@ -71,27 +89,93 @@
     <div class="hero-body">
       <div class="level">
         <div class="level-left">
-          <div class="level-item"><h1 class="title">Vendas</h1></div>
+          <div class="level-item"><h1 class="title">Entregas</h1></div>
         </div>
         <div class="level-right">
           <div class="level-item">
-            <button id="refreshVendasBtn" class="button is-primary">Atualizar</button>
+            <button id="refreshEntregasBtn" class="button is-primary">Atualizar</button>
           </div>
         </div>
       </div>
     </div>
   </section>
   <section class="section is-main-section">
-    <!-- Vendas Diárias -->
+    <!-- Container para notificações -->
+    <div id="notification-container" class="notification-container"></div>
+    <!-- Modal de Detalhes do Pedido -->
+    <div class="modal" id="detalhesModal">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head has-background-primary">
+          <p class="modal-card-title has-text-white">Detalhes do Pedido</p>
+          <button class="delete" aria-label="close" onclick="fecharModal()"></button>
+        </header>
+        <section class="modal-card-body">
+          <div class="content">
+            <div class="columns is-multiline">
+              <div class="column is-6">
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-pound"></i></span><strong>ID do Pedido:</strong></span> <span id="modalPedidoId">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-account"></i></span><strong>Cliente:</strong></span> <span id="modalClienteNumero">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-package-variant"></i></span><strong>Itens:</strong></span> <span id="modalItens">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-map-marker"></i></span><strong>Endereço:</strong></span> <span id="modalEndereco">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-information"></i></span><strong>Status:</strong></span> <span id="modalStatus">N/A</span></p>
+              </div>
+              <div class="column is-6">
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-routes"></i></span><strong>Rota:</strong></span> <span id="modalRota">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-account-check"></i></span><strong>Entregador:</strong></span> <span id="modalEntregador">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-clock-start"></i></span><strong>Hora Início:</strong></span> <span id="modalHoraInicio">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-clock-end"></i></span><strong>Hora Fim:</strong></span> <span id="modalHoraFim">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-calendar"></i></span><strong>Data do Pedido:</strong></span> <span id="modalDataPedido">N/A</span></p>
+              </div>
+              <div class="column is-12">
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-note-text"></i></span><strong>Observações:</strong></span> <span id="modalObservacoes">N/A</span></p>
+                <p><span class="icon-text"><span class="icon"><i class="mdi mdi-check-circle"></i></span><strong>Recebido:</strong></span> <span id="modalRecebido">N/A</span></p>
+              </div>
+            </div>
+          </div>
+        </section>
+        <footer class="modal-card-foot">
+          <button class="button is-primary" onclick="fecharModal()">Fechar</button>
+        </footer>
+      </div>
+    </div>
+    <!-- Métricas -->
+    <div class="tile is-ancestor mb-6">
+      <div class="tile is-parent">
+        <article class="tile is-child notification is-info">
+          <p class="title" id="totalEntregas">0</p>
+          <p class="subtitle">Total de Entregas</p>
+        </article>
+      </div>
+      <div class="tile is-parent">
+        <article class="tile is-child notification is-success">
+          <p class="title" id="entregasFinalizadas">0</p>
+          <p class="subtitle">Entregas Finalizadas</p>
+        </article>
+      </div>
+      <div class="tile is-parent">
+        <article class="tile is-child notification is-danger">
+          <p class="title" id="entregasFalha">0</p>
+          <p class="subtitle">Entregas com Falha</p>
+        </article>
+      </div>
+      <div class="tile is-parent">
+        <article class="tile is-child notification is-warning">
+          <p class="title" id="tempoMedio">0 min</p>
+          <p class="subtitle">Tempo Médio de Entrega</p>
+        </article>
+      </div>
+    </div>
+    <!-- Filtros e Tabela de Entregas -->
     <div class="card mb-6">
       <header class="card-header">
         <p class="card-header-title">
-          <span class="icon"><i class="mdi mdi-ballot"></i></span>
-          Vendas Diárias
+          <span class="icon"><i class="mdi mdi-truck-delivery"></i></span>
+          Entregas
         </p>
       </header>
       <div class="card-content">
-        <form id="filterVendasForm">
+        <form id="filterEntregasForm">
           <div class="field is-horizontal is-spaced">
             <div class="field-label is-normal">
               <label class="label">Filtros</label>
@@ -118,10 +202,27 @@
               <div class="field mr-4 is-narrow">
                 <div class="control">
                   <div class="select is-fullwidth">
-                    <select id="statusVenda">
+                    <select id="statusEntrega">
                       <option value="">Todos os Status</option>
-                      <option value="recebido">Recebido</option>
+                      <option value="novo">Novo</option>
+                      <option value="embalado">Embalado</option>
+                      <option value="entrega">Entrega</option>
+                      <option value="rua">Rua</option>
+                      <option value="finalizado">Finalizado</option>
                       <option value="falha">Falha</option>
+                      <option value="incorreto">Incorreto</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="field mr-4 is-narrow">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select id="rota">
+                      <option value="">Todas as Rotas</option>
+                      <option value="1">Rota 1</option>
+                      <option value="2">Rota 2</option>
+                      <option value="3">Rota 3</option>
                     </select>
                   </div>
                 </div>
@@ -138,39 +239,41 @@
           <table class="table is-fullwidth is-striped is-hoverable">
             <thead>
               <tr>
-                <th>ID</th>
+                <th>ID Pedido</th>
                 <th>Cliente</th>
-                <th>Valor Pago</th>
-                <th>Forma de Pagamento</th>
-                <th>Data</th>
+                <th>Itens</th>
                 <th>Endereço</th>
                 <th>Status</th>
+                <th>Rota</th>
+                <th>Entregador</th>
+                <th>Hora Início</th>
+                <th>Hora Fim</th>
                 <th>Ações</th>
               </tr>
             </thead>
-            <tbody id="vendasTable"></tbody>
+            <tbody id="entregasTable"></tbody>
           </table>
         </div>
       </div>
     </div>
-    <!-- Vendas por Clientes -->
+    <!-- Tabela de Entregadores -->
     <div class="card mb-6">
       <header class="card-header">
         <p class="card-header-title">
-          <span class="icon"><i class="mdi mdi-ballot-outline"></i></span>
-          Vendas por Clientes
+          <span class="icon"><i class="mdi mdi-account-multiple"></i></span>
+          Entregadores
         </p>
       </header>
       <div class="card-content">
-        <form id="filterClientesForm">
+        <form id="filterEntregadoresForm">
           <div class="field is-horizontal is-spaced">
             <div class="field-label is-normal">
-              <label class="label">Buscar Cliente</label>
+              <label class="label">Buscar Entregador</label>
             </div>
             <div class="field-body">
               <div class="field mr-4">
                 <p class="control is-expanded has-icons-left">
-                  <input class="input" type="text" id="buscaCliente" placeholder="Número ou Nome do Cliente">
+                  <input class="input" type="text" id="buscaEntregador" placeholder="Número ou Nome do Entregador">
                   <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
                 </p>
               </div>
@@ -186,404 +289,73 @@
           <table class="table is-fullwidth is-striped is-hoverable">
             <thead>
               <tr>
-                <th>Cliente</th>
-                <th>Total de Vendas</th>
-                <th>Valor Total</th>
-                <th>Última Compra</th>
+                <th>Entregador</th>
+                <th>Quantidade de Pedidos</th>
+                <th>Tempo Médio por Pedido</th>
+                <th>Distância Total (km)</th>
               </tr>
             </thead>
-            <tbody id="clientesTable"></tbody>
+            <tbody id="entregadoresTable"></tbody>
           </table>
         </div>
       </div>
     </div>
-<!-- Nova Seção: Vendas -->
-<div class="card mb-6">
-  <header class="card-header">
-    <p class="card-header-title">
-      <span class="icon"><i class="mdi mdi-ballot-outline"></i></span>
-      Vendas
-    </p>
-  </header>
-  <div class="card-content">
-    <form id="filterVendasForm2">
-      <div class="field is-horizontal is-spaced">
-        <div class="field-label is-normal">
-          <label class="label">Buscar Cliente</label>
-        </div>
-        <div class="field-body">
-          <div class="field mr-4">
-            <p class="control is-expanded has-icons-left">
-              <input class="input" type="text" id="buscaCliente" placeholder="Número ou Nome do Cliente">
-              <span class="icon is-small is-left"><i class="mdi mdi-account"></i></span>
-            </p>
+    <!-- Gráficos -->
+    <div class="card mb-6">
+      <header class="card-header">
+        <p class="card-header-title">
+          <span class="icon"><i class="mdi mdi-chart-bar"></i></span>
+          Análise de Entregas
+        </p>
+      </header>
+      <div class="card-content">
+        <div class="tile is-ancestor">
+          <div class="tile is-parent">
+            <article class="tile is-child">
+              <h2 class="subtitle">Pedidos por Status</h2>
+              <canvas id="statusChart"></canvas>
+            </article>
           </div>
-          <div class="field">
-            <div class="control">
-              <button type="submit" class="button is-primary">Buscar</button>
-            </div>
+          <div class="tile is-parent">
+            <article class="tile is-child">
+              <h2 class="subtitle">Distribuição por Entregador</h2>
+              <canvas id="entregadorChart"></canvas>
+            </article>
           </div>
         </div>
-      </div>
-    </form>
-    <div class="table-container">
-      <table class="table is-fullwidth is-striped is-hoverable">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Cliente</th>
-            <th>Valor Pago</th>
-            <th>Forma de Pagamento</th>
-            <th>Data</th>
-            <th>Endereço</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody id="vendasTable2"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-    
-    <!-- Modal de Edição -->
-    <div class="modal" id="editVendaModal">
-      <div class="modal-background"></div>
-      <div class="modal-card">
-        <header class="modal-card-head">
-          <p class="modal-card-title">Editar Venda</p>
-          <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
-        </header>
-        <section class="modal-card-body">
-          <form id="editVendaForm">
-            <div class="field">
-              <label class="label">ID</label>
-              <div class="control">
-                <input class="input" type="text" id="editId" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Cliente</label>
-              <div class="control">
-                <input class="input" type="text" id="editClienteNumero" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Valor Pago</label>
-              <div class="control">
-                <input class="input" type="number" id="editValorPago" step="0.01">
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Forma de Pagamento</label>
-              <div class="control">
-                <div class="select is-fullwidth">
-                  <select id="editFormaPagamento">
-                    <option value="pix">Pix</option>
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="cartao">Cartão</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Data</label>
-              <div class="control">
-                <input class="input" type="text" id="editData" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Endereço</label>
-              <div class="control">
-                <input class="input" type="text" id="editEndereco" readonly>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Status</label>
-              <div class="control">
-                <div class="select is-fullwidth">
-                  <select id="editStatus">
-                    <option value="novo">Novo</option>
-                    <option value="recebido">Recebido</option>
-                    <option value="falha">Falha</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Comprovante</label>
-              <div class="control">
-                <div id="comprovanteContainer" class="box">
-                  <p id="noComprovanteMsg" class="is-hidden">Nenhum comprovante disponível</p>
-                  <img id="comprovanteImg" class="is-hidden" style="max-width: 100%; height: auto;" alt="Comprovante">
-                </div>
-              </div>
-            </div>
-          </form>
-        </section>
-        <footer class="modal-card-foot">
-          <button class="button is-success" onclick="salvarEdicao()">Salvar</button>
-          <button class="button" onclick="closeEditModal()">Cancelar</button>
-        </footer>
+        <div class="tile is-ancestor">
+          <div class="tile is-parent">
+            <article class="tile is-child">
+              <h2 class="subtitle">Entregas por Dia (Últimos 30 Dias)</h2>
+              <canvas id="entregasDiariasChart"></canvas>
+            </article>
+          </div>
+        </div>
+        <div class="tile is-ancestor">
+          <div class="tile is-parent">
+            <article class="tile is-child">
+              <h2 class="subtitle">Tempo Médio por Status</h2>
+              <canvas id="tempoMedioStatusChart"></canvas>
+            </article>
+          </div>
+          <div class="tile is-parent">
+            <article class="tile is-child">
+              <h2 class="subtitle">Distribuição por Rota</h2>
+              <canvas id="rotaChart"></canvas>
+            </article>
+          </div>
+        </div>
+        <div class="tile is-ancestor">
+          <div class="tile is-parent">
+            <article class="tile is-child">
+              <h2 class="subtitle">Taxa de Sucesso/Falha</h2>
+              <canvas id="sucessoFalhaChart"></canvas>
+            </article>
+          </div>
+        </div>
       </div>
     </div>
   </section>
-            
-  <script>
-    
-
-    // Logout
-    document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
-      localStorage.removeItem('usuario');
-      localStorage.removeItem('permissao');
-      window.location.href = '../login.html';
-    });
-    
-    // Função para formatar datas
-    function formatarData(data) {
-      const d = new Date(data);
-      return d.toLocaleString('pt-BR');
-    }
-    
-    // Função para formatar número do cliente
-    function formatarCliente(numero) {
-      return numero.replace('@c.us', '');
-    }
-    
-    // Função para buscar e atualizar vendas diárias
-    async function atualizarVendas(filtros = {}) {
-      try {
-        const query = new URLSearchParams(filtros).toString();
-        const response = await fetch(`/api/vendas?${query}`);
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const vendas = await response.json();
-        const tbody = document.getElementById('vendasTable');
-        tbody.innerHTML = '';
-        vendas.forEach(venda => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${venda.id}</td>
-            <td>${formatarCliente(venda.cliente_numero)}</td>
-            <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
-            <td>${venda.forma_pagamento}</td>
-            <td>${formatarData(venda.data)}</td>
-            <td>${venda.endereco}</td>
-            <td>${venda.status}</td>
-            <td>
-              ${venda.tem_comprovante ? `<button class="button is-small is-info" onclick="visualizarComprovante(${venda.id})">Comprovante</button>` : ''}
-              <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
-            </td>`;
-
-              tbody.appendChild(row);});
-        if (vendas.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
-        }
-      } catch (error) {
-        alert('Erro ao carregar vendas: ' + error.message);
-      }
-    }
-    
-    async function Vendas(filtros = {}) {
-      try {
-        const query = new URLSearchParams(filtros).toString();
-        const response = await fetch(`/api/vendas?${query}`);
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const vendas = await response.json();
-        const tbody = document.getElementById('vendasTable2');
-        tbody.innerHTML = '';
-        vendas.forEach(venda => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${venda.id}</td>
-            <td>${formatarCliente(venda.cliente_numero)}</td>
-            <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
-            <td>${venda.forma_pagamento}</td>
-            <td>${formatarData(venda.data)}</td>
-            <td>${venda.endereco}</td>
-            <td>${venda.status}</td>
-            <td>
-              ${venda.tem_comprovante ? `<button class="button is-small is-info" onclick="visualizarComprovante(${venda.id})">Comprovante</button>` : ''}
-              <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
-            </td>`;
-
-              tbody.appendChild(row);});
-        if (vendas.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
-        }
-      } catch (error) {
-        alert('Erro ao carregar vendas: ' + error.message);
-      }
-    }
-    
-
-    // Função para buscar e atualizar vendas por cliente
-    async function atualizarVendasPorCliente(busca = '') {
-      try {
-        const response = await fetch(`/api/vendas-por-cliente?busca=${encodeURIComponent(busca)}`);
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const clientes = await response.json();
-        const tbody = document.getElementById('clientesTable');
-        tbody.innerHTML = '';
-        clientes.forEach(cliente => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${formatarCliente(cliente.cliente_numero)}</td>
-            <td>${cliente.total_vendas}</td>
-            <td>R$ ${parseFloat(cliente.valor_total || 0).toFixed(2)}</td>
-            <td>${cliente.ultima_compra ? formatarData(cliente.ultima_compra) : 'N/A'}</td>
-          `;
-          tbody.appendChild(row);
-        });
-        if (clientes.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered">Nenhum cliente encontrado</td></tr>';
-        }
-      } catch (error) {
-        alert('Erro ao carregar vendas por cliente: ' + error.message);
-      }
-    }
-    
-    // Função para visualizar comprovante (mantida para compatibilidade)
-    function visualizarComprovante(vendaId) {
-      window.open(`/comprovante/${vendaId}`, '_blank');
-    }
-    
-    // Função para abrir o modal de edição
-    function abrirEditModal(venda) {
-      document.getElementById('editId').value = venda.id;
-      document.getElementById('editClienteNumero').value = formatarCliente(venda.cliente_numero);
-      document.getElementById('editValorPago').value = parseFloat(venda.valor_pago || 0).toFixed(2);
-      document.getElementById('editFormaPagamento').value = venda.forma_pagamento;
-      document.getElementById('editData').value = formatarData(venda.data);
-      document.getElementById('editEndereco').value = venda.endereco;
-      document.getElementById('editStatus').value = venda.status;
-    
-      // Carregar comprovante
-      const comprovanteImg = document.getElementById('comprovanteImg');
-      const noComprovanteMsg = document.getElementById('noComprovanteMsg');
-      if (venda.tem_comprovante) {
-        comprovanteImg.src = `/comprovante/${venda.id}`;
-        comprovanteImg.classList.remove('is-hidden');
-        noComprovanteMsg.classList.add('is-hidden');
-      } else {
-        comprovanteImg.classList.add('is-hidden');
-        noComprovanteMsg.classList.remove('is-hidden');
-      }
-    
-      document.getElementById('editVendaModal').classList.add('is-active');
-    }
-    
-    // Função para fechar o modal
-    function closeEditModal() {
-      document.getElementById('editVendaModal').classList.remove('is-active');
-      document.getElementById('comprovanteImg').src = ''; // Limpar imagem
-    }
-    
-    // Função para salvar edição
-    async function salvarEdicao() {
-      const vendaId = document.getElementById('editId').value;
-      const forma_pagamento = document.getElementById('editFormaPagamento').value;
-      const status = document.getElementById('editStatus').value;
-      const valor_pago = parseFloat(document.getElementById('editValorPago').value.replace(',', '.'));
-
-    
-      try {
-        const response = await fetch(`/api/vendas/${vendaId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ forma_pagamento, status, valor_pago })
-        });
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        alert('Venda atualizada com sucesso!');
-        closeEditModal();
-        atualizarVendas();
-        Vendas(); // Atualizar tabela após edição
-      } catch (error) {
-        console.error('Erro ao salvar edição:', error);
-        alert('Erro ao salvar edição: ' + error.message);
-      }
-    }
-    
-    // Inicialização
-    document.addEventListener('DOMContentLoaded', () => {
-      atualizarVendas();
-      atualizarVendasPorCliente();
-      Vendas();
-    
-      // Filtro de vendas
-      document.getElementById('filterVendasForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const filtros = {
-          cliente_numero: document.getElementById('clienteNumero').value,
-          data_inicio: document.getElementById('dataInicio').value,
-          data_fim: document.getElementById('dataFim').value,
-          status: document.getElementById('statusVenda').value,
-        };
-        atualizarVendas(filtros);
-        Vendas(filtros);
-      });
-    
-      // Busca por cliente
-      document.getElementById('filterClientesForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const busca = document.getElementById('buscaCliente').value;
-        atualizarVendasPorCliente(busca);
-        Vendas(busca);
-      });
-    
-      // Botão de atualização
-      document.getElementById('refreshVendasBtn').addEventListener('click', () => {
-        atualizarVendas();
-        atualizarVendasPorCliente();
-        Vendas();
-      });
-    });
-    </script>
-            
-            <!-- Estilos adicionais -->
-            <style>
-              .table-container {
-                max-height: 400px;
-                overflow-y: auto;
-              }
-              .table th, .table td {
-                padding: 0.75rem;
-                text-align: left;
-                border-bottom: 1px solid #e5e7eb;
-              }
-              .table th {
-                background-color: #f3f4f6;
-                position: sticky;
-                top: 0;
-                z-index: 10;
-              }
-              .table-container {
-                max-height: 400px;
-                overflow-y: auto;
-                margin-top: 1rem;
-              }
-              .table th, .table td {
-                padding: 0.75rem;
-                text-align: left;
-                border-bottom: 1px solid #e5e7eb;
-              }
-              .table th {
-                background-color: #f3f4f6;
-                position: sticky;
-                top: 0;
-                z-index: 10;
-              }
-              .field.is-horizontal.is-spaced .field-body .field {
-                margin-bottom: 0.75rem;
-              }
-              .modal-card-body {
-                max-height: 70vh;
-                overflow-y: auto;
-              }
-              .box#comprovanteContainer {
-                text-align: center;
-}
-            </style>
-
   <footer class="footer">
     <div class="container-fluid">
       <div class="level">
@@ -592,25 +364,505 @@
             © 2025, M
           </div>
           <div class="level-item">
-              <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
-            </a>
+            <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
           </div>
         </div>
         <div class="level-right">
-          <div class="level-item">
-            <!-- <div class="logo">
-              <a href="https://justboil.me"><img src="img/justboil-logo.svg" alt="JustBoil.me"></a>
-            </div> -->
-          </div>
+          <div class="level-item"></div>
         </div>
       </div>
     </div>
   </footer>
 </div>
-<!-- Scripts below are for demo only -->
 <script type="text/javascript" src="js/main.min.js"></script>
+<script>
+// Logout
+document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+  localStorage.removeItem('usuario');
+  localStorage.removeItem('permissao');
+  window.location.href = '../login.html';
+});
 
-<!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
-<link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+// Função para formatar datas
+function formatarData(data) {
+  if (!data) return 'N/A';
+  try {
+    const d = new Date(data);
+    if (isNaN(d.getTime())) return 'N/A';
+    return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  } catch (e) {
+    console.warn('Erro ao formatar data:', data, e);
+    return 'N/A';
+  }
+}
+
+// Função para formatar número do cliente
+function formatarCliente(numero) {
+  if (numero == null || numero === '') return 'N/A';
+  try {
+    const strNumero = String(numero);
+    return strNumero.replace('@c.us', '');
+  } catch (e) {
+    console.warn('Erro ao formatar cliente:', numero, e);
+    return 'N/A';
+  }
+}
+
+// Função para formatar tempo médio
+function formatarTempoMedio(tempo) {
+  if (!tempo) return 'N/A';
+  try {
+    const [hours, minutes, seconds] = tempo.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) return 'N/A';
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } catch (e) {
+    console.warn('Erro ao formatar tempo médio:', tempo, e);
+    return 'N/A';
+  }
+}
+
+// Função para exibir notificações
+function mostrarNotificacao(mensagem, tipo = 'is-danger') {
+  const container = document.getElementById('notification-container');
+  const notification = document.createElement('div');
+  notification.className = `notification ${tipo} is-light`;
+  notification.innerHTML = `
+    <button class="delete"></button>
+    ${mensagem}
+  `;
+  container.appendChild(notification);
+  
+  notification.querySelector('.delete').addEventListener('click', () => {
+    notification.classList.add('fade-out');
+    setTimeout(() => notification.remove(), 300);
+  });
+  
+  setTimeout(() => {
+    notification.classList.add('fade-out');
+    setTimeout(() => notification.remove(), 300);
+  }, 5000);
+}
+
+// Armazenar instâncias dos gráficos
+let statusChartInstance = null;
+let entregadorChartInstance = null;
+let entregasDiariasChartInstance = null;
+let tempoMedioStatusChartInstance = null;
+let rotaChartInstance = null;
+let sucessoFalhaChartInstance = null;
+
+// Função para destruir gráficos existentes
+function destruirGraficos() {
+  [statusChartInstance, entregadorChartInstance, entregasDiariasChartInstance, 
+   tempoMedioStatusChartInstance, rotaChartInstance, sucessoFalhaChartInstance].forEach(chart => {
+    if (chart) {
+      chart.destroy();
+    }
+  });
+  statusChartInstance = null;
+  entregadorChartInstance = null;
+  entregasDiariasChartInstance = null;
+  tempoMedioStatusChartInstance = null;
+  rotaChartInstance = null;
+  sucessoFalhaChartInstance = null;
+}
+
+// Função para fechar o modal
+function fecharModal() {
+  document.getElementById('detalhesModal').classList.remove('is-active');
+}
+
+// Função para visualizar detalhes do pedido
+async function visualizarDetalhes(pedidoId) {
+  if (!pedidoId || isNaN(pedidoId) || pedidoId <= 0) {
+    mostrarNotificacao('ID do pedido inválido. Por favor, selecione um pedido válido.');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/entregas/${pedidoId}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`O pedido com ID ${pedidoId} não foi encontrado no sistema.`);
+      }
+      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    const entrega = await response.json();
+
+    document.getElementById('modalPedidoId').textContent = entrega.pedido_id || 'N/A';
+    document.getElementById('modalClienteNumero').textContent = formatarCliente(entrega.cliente_numero);
+    document.getElementById('modalItens').textContent = entrega.itens || 'N/A';
+    document.getElementById('modalEndereco').textContent = entrega.endereco || 'N/A';
+    document.getElementById('modalStatus').textContent = entrega.status || 'N/A';
+    document.getElementById('modalRota').textContent = entrega.rota || 'N/A';
+    document.getElementById('modalEntregador').textContent = formatarCliente(entrega.entregador_id);
+    document.getElementById('modalHoraInicio').textContent = formatarData(entrega.hora_inicio);
+    document.getElementById('modalHoraFim').textContent = formatarData(entrega.hora_fim);
+    document.getElementById('modalDataPedido').textContent = formatarData(entrega.data_pedido);
+    document.getElementById('modalObservacoes').textContent = entrega.observacoes || 'N/A';
+    document.getElementById('modalRecebido').textContent = entrega.recebido ? 'Sim' : 'Não';
+
+    document.getElementById('detalhesModal').classList.add('is-active');
+  } catch (error) {
+    console.error('Erro ao carregar detalhes do pedido:', error);
+    mostrarNotificacao(`Não foi possível carregar os detalhes do pedido. ${error.message}`);
+  }
+}
+
+// Função para buscar e atualizar entregas
+async function atualizarEntregas(filtros = {}) {
+  try {
+    const query = new URLSearchParams(filtros).toString();
+    const response = await fetch(`/api/entregas?${query}`);
+    if (!response.ok) {
+      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    const entregas = await response.json();
+    const tbody = document.getElementById('entregasTable');
+    tbody.innerHTML = '';
+    entregas.forEach(entrega => {
+      if (!entrega.pedido_id) {
+        console.warn('Entrega sem pedido_id:', entrega);
+        return;
+      }
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${entrega.pedido_id}</td>
+        <td>${formatarCliente(entrega.cliente_numero)}</td>
+        <td>${entrega.itens || 'N/A'}</td>
+        <td>${entrega.endereco || 'N/A'}</td>
+        <td>${entrega.status || 'N/A'}</td>
+        <td>${entrega.rota || 'N/A'}</td>
+        <td>${formatarCliente(entrega.entregador_id)}</td>
+        <td>${entrega.hora_inicio || 'N/A'}</td>
+        <td>${entrega.hora_fim || 'N/A'}</td>
+        <td>
+          <button class="button is-small is-info" onclick="visualizarDetalhes(${entrega.pedido_id})">Detalhes</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+    if (entregas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="has-text-centered">Nenhuma entrega encontrada</td></tr>';
+    }
+  } catch (error) {
+    console.error('Erro ao carregar entregas:', error);
+    mostrarNotificacao(`Não foi possível carregar as entregas. Verifique sua conexão com o servidor ou tente novamente mais tarde. Detalhes: ${error.message}`);
+  }
+}
+
+// Função para buscar e atualizar entregadores
+async function atualizarEntregadores(busca = '') {
+  try {
+    const response = await fetch(`/api/entregadores?busca=${encodeURIComponent(busca)}`);
+    if (!response.ok) {
+      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    const entregadores = await response.json();
+    const tbody = document.getElementById('entregadoresTable');
+    tbody.innerHTML = '';
+    entregadores.forEach(entregador => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${formatarCliente(entregador.entregador)}</td>
+        <td>${entregador.quantidade_pedidos || 0}</td>
+        <td>${formatarTempoMedio(entregador.tempo_medio_pedido)}</td>
+        <td>${entregador.km || 'N/A'}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    if (entregadores.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered">Nenhum entregador encontrado</td></tr>';
+    }
+  } catch (error) {
+    console.error('Erro ao carregar entregadores:', error);
+    mostrarNotificacao(`Não foi possível carregar os entregadores. Verifique sua conexão com o servidor ou tente novamente mais tarde. Detalhes: ${error.message}`);
+  }
+}
+
+// Função para atualizar métricas e gráficos
+async function atualizarMetricas() {
+  try {
+    const response = await fetch('/api/entregasmetricas');
+    if (!response.ok) {
+      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    const metricas = await response.json();
+
+    // Atualizar métricas
+    document.getElementById('totalEntregas').textContent = metricas.totalEntregas || 0;
+    document.getElementById('entregasFinalizadas').textContent = metricas.entregasFinalizadas || 0;
+    document.getElementById('entregasFalha').textContent = metricas.entregasFalha || 0;
+    document.getElementById('tempoMedio').textContent = metricas.tempoMedio ? `${metricas.tempoMedio} min` : 'N/A';
+
+    // Destruir gráficos existentes
+    destruirGraficos();
+
+    // Paleta de cores acessível
+    const cores = ['#36A2EB', '#FF6384', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF'];
+
+    // Gráfico de Status
+    statusChartInstance = new Chart(document.getElementById('statusChart'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(metricas.statusDistribuicao || {}),
+        datasets: [{
+          label: 'Pedidos por Status',
+          data: Object.values(metricas.statusDistribuicao || {}),
+          backgroundColor: cores,
+          borderColor: cores.map(c => c.replace('0.6', '1')),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Quantidade' } }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { enabled: true }
+        }
+      }
+    });
+
+    // Gráfico de Entregadores
+    entregadorChartInstance = new Chart(document.getElementById('entregadorChart'), {
+      type: 'pie',
+      data: {
+        labels: (metricas.entregadorDistribuicao || []).map(e => formatarCliente(e.entregador_id)),
+        datasets: [{
+          label: 'Pedidos por Entregador',
+          data: (metricas.entregadorDistribuicao || []).map(e => e.quantidade),
+          backgroundColor: cores,
+          borderColor: '#fff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: {
+            callbacks: {
+              label: context => `${context.label}: ${context.raw} pedidos`
+            }
+          }
+        }
+      }
+    });
+
+    // Gráfico de Entregas Diárias
+    entregasDiariasChartInstance = new Chart(document.getElementById('entregasDiariasChart'), {
+      type: 'line',
+      data: {
+        labels: (metricas.entregasDiarias || []).map(d => new Date(d.data).toLocaleDateString('pt-BR')),
+        datasets: [{
+          label: 'Entregas por Dia',
+          data: (metricas.entregasDiarias || []).map(d => d.quantidade),
+          borderColor: '#36A2EB',
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Quantidade' } },
+          x: { title: { display: true, text: 'Data' } }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { enabled: true }
+        }
+      }
+    });
+
+    // Gráfico de Tempo Médio por Status
+    tempoMedioStatusChartInstance = new Chart(document.getElementById('tempoMedioStatusChart'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(metricas.tempoMedioPorStatus || {}),
+        datasets: [{
+          label: 'Tempo Médio (min)',
+          data: Object.values(metricas.tempoMedioPorStatus || {}),
+          backgroundColor: cores,
+          borderColor: cores.map(c => c.replace('0.6', '1')),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Minutos' } }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: {
+            callbacks: {
+              label: context => `${context.label}: ${context.raw} min`
+            }
+          }
+        }
+      }
+    });
+
+    // Gráfico de Distribuição por Rota
+    rotaChartInstance = new Chart(document.getElementById('rotaChart'), {
+      type: 'pie',
+      data: {
+        labels: Object.keys(metricas.rotaDistribuicao || {}),
+        datasets: [{
+          label: 'Entregas por Rota',
+          data: Object.values(metricas.rotaDistribuicao || {}),
+          backgroundColor: cores,
+          borderColor: '#fff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: {
+            callbacks: {
+              label: context => `${context.label}: ${context.raw} entregas`
+            }
+          }
+        }
+      }
+    });
+
+    // Gráfico de Taxa de Sucesso/Falha
+    sucessoFalhaChartInstance = new Chart(document.getElementById('sucessoFalhaChart'), {
+      type: 'pie',
+      data: {
+        labels: ['Finalizadas', 'Falhas'],
+        datasets: [{
+          label: 'Taxa de Sucesso/Falha',
+          data: [metricas.entregasFinalizadas || 0, metricas.entregasFalha || 0],
+          backgroundColor: ['#36A2EB', '#FF6384'],
+          borderColor: '#fff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: {
+            callbacks: {
+              label: context => `${context.label}: ${context.raw} (${((context.raw / (metricas.totalEntregas || 1)) * 100).toFixed(1)}%)`
+            }
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao carregar métricas:', error);
+    mostrarNotificacao(`Não foi possível carregar as métricas e gráficos. Verifique sua conexão com o servidor ou tente novamente mais tarde. Detalhes: ${error.message}`);
+  }
+}
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+  atualizarEntregas();
+  atualizarEntregadores();
+  atualizarMetricas();
+
+  document.getElementById('filterEntregasForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const filtros = {
+      cliente_numero: document.getElementById('clienteNumero').value,
+      data_inicio: document.getElementById('dataInicio').value,
+      data_fim: document.getElementById('dataFim').value,
+      status: document.getElementById('statusEntrega').value,
+      rota: document.getElementById('rota').value
+    };
+    atualizarEntregas(filtros);
+  });
+
+  document.getElementById('filterEntregadoresForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const busca = document.getElementById('buscaEntregador').value;
+    atualizarEntregadores(busca);
+  });
+
+  document.getElementById('refreshEntregasBtn').addEventListener('click', () => {
+    atualizarEntregas();
+    atualizarEntregadores();
+    atualizarMetricas();
+  });
+});
+</script>
+<style>
+  .table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 1rem;
+  }
+  .table th, .table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .table th {
+    background-color: #f3f4f6;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .field.is-horizontal.is-spaced .field-body .field {
+    margin-bottom: 0.75rem;
+  }
+  .tile.is-child {
+    padding: 1rem;
+  }
+  .modal-card {
+    max-width: 600px;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .modal-card-head {
+    border-bottom: none;
+  }
+  .modal-card-body .content p {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+  }
+  .modal-card-body .content p .icon-text {
+    min-width: 150px;
+  }
+  .modal-card-foot {
+    border-top: none;
+    justify-content: flex-end;
+  }
+  .notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+  }
+  .notification {
+    margin-bottom: 10px;
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
+  }
+  .notification.fade-out {
+    opacity: 0;
+  }
+  canvas {
+    max-height: 300px;
+  }
+</style>
 </body>
 </html>

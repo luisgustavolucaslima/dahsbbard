@@ -15,13 +15,7 @@
       // Verifica se o usuário e permissão estão armazenados no localStorage
       if (!usuario || !permissao) {
         alert('Você não está autenticado! Redirecionando para o login...');
-        window.location.href = 'login.html'; // Redireciona para a página de login
-      }
-  
-      // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
-      if (permissao !== 'admin') {
-        alert('Você não tem permissão para acessar essa área!');
-        window.location.href = 'login.html'; // Redireciona para o login se não tiver permissão
+        window.location.href = '../login.html'; // Redireciona para a página de login
       }
     });
   </script>
