@@ -82,6 +82,87 @@
     </style>
   </head>
   <body>
+    <div class="modal" id="modalNovoPedido">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Novo Pedido Manual</p>
+      <button class="delete" aria-label="close" id="fecharModalPedido"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Número do Cliente</label>
+        <div class="control">
+          <input class="input" id="clienteNumero" placeholder="Ex: 45991540729">
+        </div>
+      </div>
+
+      <div id="listaProdutos">
+        <div class="field is-grouped mb-2 produto-item">
+          <div class="control is-expanded">
+            <div class="select is-fullwidth">
+              <select class="produtoSelect">
+                <option value="">Selecione um produto</option>
+              </select>
+            </div>
+          </div>
+          <div class="control">
+            <input class="input quantidadeInput" type="number" min="1" value="1">
+          </div>
+          <div class="control">
+            <button class="button is-danger removerProduto" type="button">
+              <span class="icon"><i class="mdi mdi-close"></i></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button class="button is-info is-light mb-4" type="button" id="adicionarProduto">
+        <span class="icon"><i class="mdi mdi-plus"></i></span>
+        <span>Adicionar Produto</span>
+      </button>
+
+      <div class="field">
+        <label class="label">Forma de Pagamento</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="formaPagamento">
+              <option value="">Selecione</option>
+              <option value="pix">PIX</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix+dinheiro">PIX + Dinheiro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" id="valorPagoContainer" style="display: none;">
+        <label class="label">Valor Pago (dinheiro)</label>
+        <div class="control">
+          <input class="input" id="valorPago" type="number" min="0" step="0.01" placeholder="R$ 0,00">
+        </div>
+      </div>
+
+      <div class="field" id="comprovanteContainer" style="display: none;">
+        <label class="label">Comprovante de Pagamento (opcional)</label>
+        <div class="control">
+          <input type="file" id="comprovante" accept="image/*">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Endereço</label>
+        <div class="control">
+          <input class="input" id="enderecoPedido" placeholder="Rua Exemplo, 123 - Bairro">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" type="button" id="confirmarPedidoBtn">Salvar Pedido</button>
+      <button class="button" id="cancelarPedidoBtn">Cancelar</button>
+    </footer>
+  </div>
+</div>
     <div id="loader" class="loader"></div>
     <div id="app">
       <div id="notification-container" class="notification-container"></div>
@@ -136,6 +217,22 @@
           <div class="level">
             <div class="level-left">
               <div class="level-item"><h1 class="title">Painel do Gerente de Vendas</h1></div>
+              <section class="section">
+        <div class="buttons">
+        <a class="button is-success is-light" id="abrirModalPedido">
+        <span class="icon"><i class="mdi mdi-plus-circle-outline"></i></span>
+        <span>Novo Pedido Manual</span>
+          </a>
+        <a href="estoque.html" class="button is-warning is-light">
+          <span class="icon"><i class="mdi mdi-package-variant-closed"></i></span>
+          <span>Estoque</span>
+        </a>
+        <a href="entregas.html" class="button is-link is-light">
+          <span class="icon"><i class="mdi mdi-truck-delivery"></i></span>
+          <span>Ver Entregas</span>
+        </a>
+  </div>
+</section>
             </div>
             <div class="level-right">
               <div class="level-item">
@@ -170,6 +267,24 @@
             </div>
           </div>
         </div>
+                <div class="card mb-5">
+                        <header class="card-header">
+                          <p class="card-header-title">
+                            <span class="icon"><i class="mdi mdi-chart-donut"></i></span>
+                            Resumo por Status
+                          </p>
+                    </header>
+                    <div class="card-content">
+                      <div class="columns is-multiline has-text-centered">
+                        <div class="column is-one-fifth"><strong>Novo:</strong> <span id="status-novo">0</span></div>
+                        <div class="column is-one-fifth"><strong>Embalado:</strong> <span id="status-embalado">0</span></div>
+                        <div class="column is-one-fifth"><strong>Saída:</strong> <span id="status-entrega">0</span></div>
+                        <div class="column is-one-fifth"><strong>Na Rua:</strong> <span id="status-rua">0</span></div>
+                        <div class="column is-one-fifth"><strong>Finalizado:</strong> <span id="status-finalizado">0</span></div>
+                      </div>
+                </div>
+      </div>
+
         <!-- Vendas Diárias (somente visualização) -->
         <div class="card mb-6">
           <header class="card-header">
@@ -231,6 +346,28 @@
     
     <script>
 
+   async function atualizarResumoPorStatus() {
+                      try {
+                        const res = await fetch('/pedidos_diarios');
+                        const pedidos = await res.json();
+
+                        const statusMap = { novo: 0, embalado: 0, entrega: 0, finalizado: 0, rua: 0 };
+
+                              pedidos.forEach(p => {
+                    const status = (p.status || '').toLowerCase().trim();
+                    if (statusMap.hasOwnProperty(status)) {
+                      statusMap[status]++;
+                    }
+        });
+
+                        for (const status in statusMap) {
+                    const span = document.getElementById(`status-${status}`);
+                    if (span) span.textContent = statusMap[status];
+                  }
+                      } catch (err) {
+                        console.error("Erro ao carregar resumo de status:", err);
+                      }
+  }
 
 function verComprovante(id) {
   fetch(`/comprovante/${id}`)
@@ -423,6 +560,7 @@ function verComprovante(id) {
         }
         atualizarPedidosPendentes();
         atualizarVendas();
+         atualizarResumoPorStatus();
       });
 
       // Logout
@@ -541,8 +679,9 @@ function verComprovante(id) {
         });
 
         document.getElementById('refreshDashboardBtn').addEventListener('click', () => {
-          atualizarPedidosPendentes();
+        atualizarPedidosPendentes();
           atualizarVendas();
+          atualizarResumoPorStatus(); // novo
         });
       });
     
@@ -654,6 +793,134 @@ async function salvarItens() {
 
 
 document.addEventListener("DOMContentLoaded", carregarProdutos);
+
+  const modal = document.getElementById('modalNovoPedido');
+document.getElementById('abrirModalPedido').addEventListener('click', () => {
+  modal.classList.add('is-active');
+  carregarProdutos();
+});
+
+document.getElementById('fecharModalPedido').addEventListener('click', () => modal.classList.remove('is-active'));
+document.getElementById('cancelarPedidoBtn').addEventListener('click', () => modal.classList.remove('is-active'));
+
+document.getElementById('formaPagamento').addEventListener('change', (e) => {
+  const pagamento = e.target.value;
+  document.getElementById('valorPagoContainer').style.display = pagamento === 'dinheiro' || pagamento === 'pix+dinheiro' ? 'block' : 'none';
+  document.getElementById('comprovanteContainer').style.display = pagamento.includes('pix') ? 'block' : 'none';
+});
+
+
+async function carregarProdutos() {
+  const res = await fetch('/api/produtos');
+  produtosDisponiveis = await res.json();
+  atualizarSelectsProduto();
+}
+
+function atualizarSelectsProduto() {
+  document.querySelectorAll('.produtoSelect').forEach(select => {
+    select.innerHTML = `<option value="">Selecione um produto</option>`;
+    produtosDisponiveis.forEach(p => {
+      select.innerHTML += `<option value="${p.id}">${p.nome} - R$ ${parseFloat(p.valor_unitario).toFixed(2)}</option>`;
+    });
+  });
+}
+
+document.getElementById('adicionarProduto').addEventListener('click', () => {
+  const novaLinha = document.createElement('div');
+  novaLinha.className = 'field is-grouped mb-2 produto-item';
+  novaLinha.innerHTML = `
+    <div class="control is-expanded">
+      <div class="select is-fullwidth">
+        <select class="produtoSelect"></select>
+      </div>
+    </div>
+    <div class="control">
+      <input class="input quantidadeInput" type="number" min="1" value="1">
+    </div>
+    <div class="control">
+      <button class="button is-danger removerProduto" type="button">
+        <span class="icon"><i class="mdi mdi-close"></i></span>
+      </button>
+    </div>
+  `;
+  document.getElementById('listaProdutos').appendChild(novaLinha);
+  atualizarSelectsProduto();
+});
+
+document.getElementById('listaProdutos').addEventListener('click', (e) => {
+  if (e.target.closest('.removerProduto')) {
+    e.target.closest('.produto-item').remove();
+  }
+});
+
+document.getElementById('confirmarPedidoBtn').addEventListener('click', async () => {
+  const cliente = document.getElementById('clienteNumero').value.trim();
+  const pagamento = document.getElementById('formaPagamento').value;
+  const endereco = document.getElementById('enderecoPedido').value.trim();
+  const valorPago = document.getElementById('valorPago').value;
+  const comprovanteFile = document.getElementById('comprovante').files[0];
+
+  if (!cliente || !pagamento || !endereco || endereco.length < 5 || !endereco.match(/[0-9]/)) {
+    mostrarToast('Preencha todos os campos obrigatórios.', false);
+    return;
+  }
+
+  const produtos = Array.from(document.querySelectorAll('.produto-item')).map(item => {
+    return {
+      produto_id: item.querySelector('.produtoSelect').value,
+      quantidade: parseInt(item.querySelector('.quantidadeInput').value)
+    };
+  }).filter(p => p.produto_id && p.quantidade > 0);
+
+  if (produtos.length === 0) {
+    mostrarToast('Adicione ao menos 1 produto.', false);
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('cliente_numero', cliente);
+  formData.append('forma_pagamento', pagamento);
+  formData.append('endereco', endereco);
+  formData.append('itens', JSON.stringify(produtos));
+if (valorPago) {
+  formData.append('valor_pago', valorPago); // SEMPRE envia
+  if (pagamento === 'pix+dinheiro') {
+    formData.append('valor_dinheiro', valorPago); // SOMENTE se for PIX + dinheiro
+  }
+  if (pagamento === 'dinheiro') {
+    formData.append('valor_dinheiro', valorPago); // SOMENTE se for PIX + dinheiro
+  }
+}
+if (comprovanteFile) {
+  formData.append('comprovante', comprovanteFile);
+}
+
+
+  try {
+    const resposta = await fetch('/api/pedido_manual', {
+      method: 'POST',
+      body: formData
+    });
+
+    const json = await resposta.json();
+    mostrarToast(json.mensagem || 'Pedido registrado!', resposta.ok);
+    if (resposta.ok) modal.classList.remove('is-active');
+  } catch (e) {
+    mostrarToast('Erro ao enviar pedido.', false);
+  }
+
+});
+
+function mostrarToast(msg, sucesso = true) {
+  const toast = document.getElementById('toast');
+  toast.className = `notification is-light ${sucesso ? 'is-success' : 'is-danger'}`;
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 3000);
+}
+
+
+
 
 </script>
   
@@ -779,8 +1046,11 @@ function informacoesDoPedido(id) {
 function fecharModalInfo() {
   document.getElementById('modalInfoPedido').classList.remove('is-active');
 }
+
+
+
 </script>
 
-
+<div id="toast" class="notification is-light is-success" style="display:none; position:fixed; top:1rem; right:1rem; z-index:1000;"></div>
 </body>
 </html>

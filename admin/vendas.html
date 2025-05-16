@@ -381,6 +381,31 @@
         </div>
       </footer>
     </div>
+    <!-- Modal de Informações do Pedido -->
+<div class="modal" id="modalInfoPedido">
+  <div class="modal-background" onclick="fecharModalInfo()"></div>
+  <div class="modal-card" style="width: 600px;">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Detalhes do Pedido</p>
+      <button class="delete" aria-label="close" onclick="fecharModalInfo()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div id="detalhesPedidoContent">
+        <p><strong>ID do Pedido:</strong> <span id="infoId"></span></p>
+        <p><strong>Cliente:</strong> <span id="infoCliente"></span></p>
+        <p><strong>Endereço:</strong> <span id="infoEndereco"></span></p>
+        <p><strong>Produtos:</strong> <span id="infoProdutos"></span></p>
+        <p><strong>Valor Total:</strong> R$ <span id="infoValor"></span></p>
+        <p><strong>Forma de Pagamento:</strong> <span id="infoPagamento"></span></p>
+        <p><strong>Status:</strong> <span id="infoStatus"></span></p>
+        <p><strong>Data:</strong> <span id="infoData"></span></p>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button" onclick="fecharModalInfo()">Fechar</button>
+    </footer>
+  </div>
+</div>
     <script type="text/javascript" src="js/main.min.js"></script>
     <script>
       function showNotification(message, type = 'info') {
@@ -452,6 +477,7 @@
               <td>${venda.status}</td>
               <td>
                 <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
+                <button class="button is-small is-info" onclick="informacoesDoPedido(${venda.id})">🔍 Ver Pedido</button>
               </td>`;
             tbody.appendChild(row);
           });
@@ -514,6 +540,7 @@
               <td>${venda.status}</td>
               <td>
                 <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
+                <button class="button is-small is-info" onclick="informacoesDoPedido(${venda.id})">🔍 Ver Pedido</button>
               </td>`;
             tbody.appendChild(row);
           });
@@ -541,6 +568,52 @@
     document.getElementById('editVendaModal').classList.add('is-active');
   }
 }
+
+function informacoesDoPedido(id) {
+  fetch('/api/pedidos/' + id)
+    .then(res => res.json())
+    .then(p => {
+      if (!p || p.erro) {
+        showNotification("Pedido não encontrado.", "warning");
+        return;
+      }
+
+      document.getElementById('infoId').textContent =
+        p.pedido_id ?? p.id ?? id;
+
+      document.getElementById('infoCliente').textContent =
+        p.cliente_numero?.replace('@c.us', '') || "-";
+
+      document.getElementById('infoEndereco').textContent =
+        p.endereco || "-";
+
+      document.getElementById('infoProdutos').textContent =
+        p.itens || p.produtos || "-";
+
+      document.getElementById('infoValor').textContent =
+        p.valor_total && p.valor_total !== "-" ? `R$ ${parseFloat(p.valor_total).toFixed(2)}` : "-";
+
+      document.getElementById('infoPagamento').textContent =
+        p.forma_pagamento || "-";
+
+      document.getElementById('infoStatus').textContent =
+        p.status || "-";
+
+      const dataFormatada = p.data_pedido || p.data;
+      document.getElementById('infoData').textContent =
+        dataFormatada ? new Date(dataFormatada).toLocaleString("pt-BR") : "-";
+
+      document.getElementById('modalInfoPedido').classList.add('is-active');
+    })
+    .catch(err => {
+      showNotification("Erro ao carregar pedido: " + err.message, "danger");
+    });
+}
+
+function fecharModalInfo() {
+  document.getElementById('modalInfoPedido').classList.remove('is-active');
+}
+
 
 async function abrirEditModal(venda) {
   document.getElementById('editId').value = venda.id;

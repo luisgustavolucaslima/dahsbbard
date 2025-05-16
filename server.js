@@ -640,8 +640,8 @@ try {
 
     // Inserir pedido
     const [pedido] = await conn.query(`
-      INSERT INTO pedidos_diarios (cliente_numero, venda_id, data, endereco, status, valido)
-      VALUES (?, ?, NOW(), ?, 'novo', 0)
+      INSERT INTO pedidos_diarios (cliente_numero, venda_id, data, endereco, status)
+      VALUES (?, ?, NOW(), ?, 'novo')
     `, [cliente_numero, vendaId, endereco]);
 
     const pedidoId = pedido.insertId;
