@@ -12,6 +12,87 @@
   <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
 </head>
 <body>
+<div class="modal" id="modalNovoPedido">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Novo Pedido Manual</p>
+      <button class="delete" aria-label="close" id="fecharModalPedido"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Número do Cliente</label>
+        <div class="control">
+          <input class="input" id="clienteNumero" placeholder="Ex: 45991540729">
+        </div>
+      </div>
+
+      <div id="listaProdutos">
+        <div class="field is-grouped mb-2 produto-item">
+          <div class="control is-expanded">
+            <div class="select is-fullwidth">
+              <select class="produtoSelect">
+                <option value="">Selecione um produto</option>
+              </select>
+            </div>
+          </div>
+          <div class="control">
+            <input class="input quantidadeInput" type="number" min="1" value="1">
+          </div>
+          <div class="control">
+            <button class="button is-danger removerProduto" type="button">
+              <span class="icon"><i class="mdi mdi-close"></i></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button class="button is-info is-light mb-4" type="button" id="adicionarProduto">
+        <span class="icon"><i class="mdi mdi-plus"></i></span>
+        <span>Adicionar Produto</span>
+      </button>
+
+      <div class="field">
+        <label class="label">Forma de Pagamento</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="formaPagamento">
+              <option value="">Selecione</option>
+              <option value="pix">PIX</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix+dinheiro">PIX + Dinheiro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" id="valorPagoContainer" style="display: none;">
+        <label class="label">Valor Pago (dinheiro)</label>
+        <div class="control">
+          <input class="input" id="valorPago" type="number" min="0" step="0.01" placeholder="R$ 0,00">
+        </div>
+      </div>
+
+      <div class="field" id="comprovanteContainer" style="display: none;">
+        <label class="label">Comprovante de Pagamento (opcional)</label>
+        <div class="control">
+          <input type="file" id="comprovante" accept="image/*">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Endereço</label>
+        <div class="control">
+          <input class="input" id="enderecoPedido" placeholder="Rua Exemplo, 123 - Bairro">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" type="button" id="confirmarPedidoBtn">Salvar Pedido</button>
+      <button class="button" id="cancelarPedidoBtn">Cancelar</button>
+    </footer>
+  </div>
+</div>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const usuario = localStorage.getItem('usuario');
@@ -19,13 +100,13 @@
   
       // Verifica se o usuário e permissão estão armazenados no localStorage
       if (!usuario || !permissao) {
-        alert('Você não está autenticado! Redirecionando para o login...');
+        mostrarToast('Você não está autenticado! Redirecionando para o login...',false);
         window.location.href = '../login.html'; // Redireciona para a página de login
       }
   
       // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
       if (permissao !== 'admin') {
-        alert('Você não tem permissão para acessar essa área!');
+        mostrarToast('Você não tem permissão para acessar essa área!', false);
         window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
       }
     });
@@ -44,19 +125,6 @@
     </div>
     <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
       <div class="navbar-end">
-        <div class="navbar-item has-dropdown has-dropdown-with-icons has-divider is-hoverable">
-          <a class="navbar-link is-arrowless">
-            <span class="icon"><i class="mdi mdi-menu"></i></span>
-            <span>Menu</span>
-            <span class="icon"><i class="mdi mdi-chevron-down"></i></span>
-          </a>
-          <div class="navbar-dropdown">
-            <a class="navbar-item"><span class="icon"><i class="mdi mdi-settings"></i></span><span>Settings</span></a>
-            <a class="navbar-item"><span class="icon"><i class="mdi mdi-email"></i></span><span>Messages</span></a>
-            <hr class="navbar-divider">
-            <a class="navbar-item"><span class="icon"><i class="mdi mdi-logout"></i></span><span>Log Out</span></a>
-          </div>
-        </div>
         <a title="Log out" class="navbar-item is-desktop-icon-only">
           <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
         </a>
@@ -79,18 +147,9 @@
       </ul>
       <p class="menu-label">Logic Ice</p>
       <ul class="menu-list">
-        <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
         <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
-        <li>
-          <a class="has-icon has-dropdown-icon">
-            <span class="icon"><i class="mdi mdi-view-list"></i></span><span class="menu-item-label">Entregas</span>
-            <div class="dropdown-icon"><span class="icon"><i class="mdi mdi-plus"></i></span></div>
-          </a>
-          <ul>
-            <li><a href="#void"><span>Sub-item One</span></a></li>
-            <li><a href="#void"><span>Sub-item Two</span></a></li>
-          </ul>
-        </li>
+         <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
       </ul>
     </div>
   </aside>
@@ -108,10 +167,30 @@
       <div class="level">
         <div class="level-left">
           <div class="level-item"><h1 class="title">Dashboard</h1></div>
+          <section class="section">
+  <div class="buttons">
+   <a class="button is-success is-light" id="abrirModalPedido">
+  <span class="icon"><i class="mdi mdi-plus-circle-outline"></i></span>
+  <span>Novo Pedido Manual</span>
+</a>
+    <a href="estoque.html" class="button is-warning is-light">
+      <span class="icon"><i class="mdi mdi-package-variant-closed"></i></span>
+      <span>Adicionar Produto</span>
+    </a>
+    <a href="entregas.html" class="button is-link is-light">
+      <span class="icon"><i class="mdi mdi-truck-delivery"></i></span>
+      <span>Ver Entregas</span>
+    </a>
+  </div>
+</section>
+
         </div>
         <div class="level-right">
           <div class="level-item">
-            <button id="refreshDashboardBtn" class="button is-primary">Atualizar</button>
+            <button id="refreshDashboardBtn" class="button is-primary">
+                <span class="icon"><i class="mdi mdi-refresh"></i></span>
+                <span>Atualizar</span>
+              </button>
           </div>
         </div>
       </div>
@@ -124,7 +203,7 @@
           <div class="card-content">
             <div class="level is-mobile">
               <div class="level-item">
-                <div class="is-widget-label"><h3 class="subtitle is-spaced">Total Vendas</h3>
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Total Vendas Diarias</h3>
                   <h1 class="title" id="totalVendas">0</h1>
                 </div>
               </div>
@@ -140,7 +219,23 @@
           <div class="card-content">
             <div class="level is-mobile">
               <div class="level-item">
-                <div class="is-widget-label"><h3 class="subtitle is-spaced">Receita Total</h3>
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Total Diaria</h3>
+                  <h1 class="title" id="totalReceita">R$ 0,00</h1>
+                </div>
+              </div>
+              <div class="level-item has-widget-icon">
+                <div class="is-widget-icon"><span class="icon has-text-info is-large"><i class="mdi mdi-currency-usd mdi-48px"></i></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tile is-parent">
+        <div class="card tile is-child">
+          <div class="card-content">
+            <div class="level is-mobile">
+              <div class="level-item">
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Total Diaria Recebida</h3>
                   <h1 class="title" id="totalReceita">R$ 0,00</h1>
                 </div>
               </div>
@@ -172,7 +267,7 @@
           <div class="card-content">
             <div class="level is-mobile">
               <div class="level-item">
-                <div class="is-widget-label"><h3 class="subtitle is-spaced">Valor Médio por Pedido</h3>
+                <div class="is-widget-label"><h3 class="subtitle is-spaced">Valor Médio por Pedido Diario</h3>
                   <h1 class="title" id="valorMedio">R$ 0,00</h1>
                 </div>
               </div>
@@ -286,6 +381,7 @@
   function formatarCliente(numero) {
       return numero.replace('@c.us', '');
     }
+  
 
   // Função para atualizar o dashboard
   async function atualizarDashboard() {
@@ -397,6 +493,8 @@
         }
       });
 
+      
+
       // Atualizar gráfico de top produtos
       const productsChart = new Chart(document.getElementById('productsChart'), {
         type: 'bar',
@@ -501,8 +599,10 @@
       });
     } catch (error) {
       console.error('Erro ao atualizar dashboard:', error);
-      alert('Erro ao carregar dashboard: ' + error.message);
+      mostrarToast('Erro ao carregar dashboard: ', false)
     }
+    setInterval(atualizarDashboard, 60000); // Atualiza a cada 1 minuto
+
   }
 
   // Inicialização
@@ -510,6 +610,132 @@
     atualizarDashboard();
     document.getElementById('refreshDashboardBtn').addEventListener('click', atualizarDashboard);
   });
+
+  const modal = document.getElementById('modalNovoPedido');
+document.getElementById('abrirModalPedido').addEventListener('click', () => {
+  modal.classList.add('is-active');
+  carregarProdutos();
+});
+
+document.getElementById('fecharModalPedido').addEventListener('click', () => modal.classList.remove('is-active'));
+document.getElementById('cancelarPedidoBtn').addEventListener('click', () => modal.classList.remove('is-active'));
+
+document.getElementById('formaPagamento').addEventListener('change', (e) => {
+  const pagamento = e.target.value;
+  document.getElementById('valorPagoContainer').style.display = pagamento === 'dinheiro' || pagamento === 'pix+dinheiro' ? 'block' : 'none';
+  document.getElementById('comprovanteContainer').style.display = pagamento.includes('pix') ? 'block' : 'none';
+});
+
+let produtosDisponiveis = [];
+
+async function carregarProdutos() {
+  const res = await fetch('/api/produtos');
+  produtosDisponiveis = await res.json();
+  atualizarSelectsProduto();
+}
+
+function atualizarSelectsProduto() {
+  document.querySelectorAll('.produtoSelect').forEach(select => {
+    select.innerHTML = `<option value="">Selecione um produto</option>`;
+    produtosDisponiveis.forEach(p => {
+      select.innerHTML += `<option value="${p.id}">${p.nome} - R$ ${parseFloat(p.valor_unitario).toFixed(2)}</option>`;
+    });
+  });
+}
+
+document.getElementById('adicionarProduto').addEventListener('click', () => {
+  const novaLinha = document.createElement('div');
+  novaLinha.className = 'field is-grouped mb-2 produto-item';
+  novaLinha.innerHTML = `
+    <div class="control is-expanded">
+      <div class="select is-fullwidth">
+        <select class="produtoSelect"></select>
+      </div>
+    </div>
+    <div class="control">
+      <input class="input quantidadeInput" type="number" min="1" value="1">
+    </div>
+    <div class="control">
+      <button class="button is-danger removerProduto" type="button">
+        <span class="icon"><i class="mdi mdi-close"></i></span>
+      </button>
+    </div>
+  `;
+  document.getElementById('listaProdutos').appendChild(novaLinha);
+  atualizarSelectsProduto();
+});
+
+document.getElementById('listaProdutos').addEventListener('click', (e) => {
+  if (e.target.closest('.removerProduto')) {
+    e.target.closest('.produto-item').remove();
+  }
+});
+
+document.getElementById('confirmarPedidoBtn').addEventListener('click', async () => {
+  const cliente = document.getElementById('clienteNumero').value.trim();
+  const pagamento = document.getElementById('formaPagamento').value;
+  const endereco = document.getElementById('enderecoPedido').value.trim();
+  const valorPago = document.getElementById('valorPago').value;
+  const comprovanteFile = document.getElementById('comprovante').files[0];
+
+  if (!cliente || !pagamento || !endereco || endereco.length < 5 || !endereco.match(/[0-9]/)) {
+    mostrarToast('Preencha todos os campos obrigatórios.', false);
+    return;
+  }
+
+  const produtos = Array.from(document.querySelectorAll('.produto-item')).map(item => {
+    return {
+      produto_id: item.querySelector('.produtoSelect').value,
+      quantidade: parseInt(item.querySelector('.quantidadeInput').value)
+    };
+  }).filter(p => p.produto_id && p.quantidade > 0);
+
+  if (produtos.length === 0) {
+    mostrarToast('Adicione ao menos 1 produto.', false);
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('cliente_numero', cliente);
+  formData.append('forma_pagamento', pagamento);
+  formData.append('endereco', endereco);
+  formData.append('itens', JSON.stringify(produtos));
+if (valorPago) {
+  formData.append('valor_pago', valorPago); // SEMPRE envia
+  if (pagamento === 'pix+dinheiro') {
+    formData.append('valor_dinheiro', valorPago); // SOMENTE se for PIX + dinheiro
+  }
+  if (pagamento === 'dinheiro') {
+    formData.append('valor_dinheiro', valorPago); // SOMENTE se for PIX + dinheiro
+  }
+}
+if (comprovanteFile) {
+  formData.append('comprovante', comprovanteFile);
+}
+
+
+  try {
+    const resposta = await fetch('/api/pedido_manual', {
+      method: 'POST',
+      body: formData
+    });
+
+    const json = await resposta.json();
+    mostrarToast(json.mensagem || 'Pedido registrado!', resposta.ok);
+    if (resposta.ok) modal.classList.remove('is-active');
+  } catch (e) {
+    mostrarToast('Erro ao enviar pedido.', false);
+  }
+});
+
+function mostrarToast(msg, sucesso = true) {
+  const toast = document.getElementById('toast');
+  toast.className = `notification is-light ${sucesso ? 'is-success' : 'is-danger'}`;
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 3000);
+}
+
 </script>
 <style>
   .table-container {
@@ -541,5 +767,7 @@
 
 <!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
 <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+<div id="toast" class="notification is-light is-success" style="display:none; position:fixed; top:1rem; right:1rem; z-index:1000;"></div>
+
 </body>
 </html>

@@ -3,12 +3,13 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Almoxarifado - Painel de Vendas</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../style.css">
 </head>
 <body>
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
+
       const usuario = localStorage.getItem('usuario');
       const permissao = localStorage.getItem('permissao');
   
@@ -18,7 +19,51 @@
         window.location.href = '../login.html'; // Redireciona para a página de login
       }
     });
+    
   </script>
+  <script>
+  let modalCallback = null;
+
+  function mostrarModalConfirmacao(texto, callback) {
+    document.getElementById('modalText').innerText = texto;
+    document.getElementById('modalConfirm').style.display = 'flex';
+    modalCallback = callback;
+  }
+
+  async function alterarStatus(id, statusAtual) {
+    mostrarModalConfirmacao("Deseja realmente alterar o status do pedido?", async (confirmado) => {
+      if (!confirmado) return;
+      await fetch(`/alterar_status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, statusAtual })
+      });
+      carregarPedidos();
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // login e modal
+    const usuario = localStorage.getItem('usuario');
+    const permissao = localStorage.getItem('permissao');
+
+    if (!usuario || !permissao) {
+      alert('Você não está autenticado! Redirecionando para o login...');
+      window.location.href = '../login.html';
+    }
+
+    document.getElementById('modalSim').onclick = () => {
+      document.getElementById('modalConfirm').style.display = 'none';
+      if (modalCallback) modalCallback(true);
+    };
+
+    document.getElementById('modalNao').onclick = () => {
+      document.getElementById('modalConfirm').style.display = 'none';
+      if (modalCallback) modalCallback(false);
+    };
+  });
+</script>
+
   <button onclick=toggleTheme() id="themeToggle">🌓</button>
 
 
@@ -27,6 +72,13 @@
     Pedidos: <span id="total-vendas">0</span>
   </div>
   <h1>Painel do Almoxarifado</h1>
+  <nav class="menu-topo">
+  <a href="producao.html" class="ativo">🗂 Produção</a>
+  <a href="estoque.html">📦 Estoque</a>
+</nav>
+
+</nav>
+
   <div class="board">
     <div class="column" id="novo">
       <h2>🆕 Novo (<span id="count-novo">0</span>)</h2>
@@ -53,6 +105,9 @@
   <div id="toast" class="toast"></div>
 
   <script>
+
+   
+
 
 function formatarNumero(raw) {
   // Remove #, sufixo "@c.us" e código do país "55"
@@ -88,7 +143,8 @@ function formatarNumero(raw) {
         document.getElementById('lista-' + status).innerHTML = '';
       });
 
-      pedidos.forEach(p => {
+      pedidos.forEach((p, idx) => {
+  const numeroPedido = p.pedido_numero || idx + 1; // Começa do 1 a cada dia
   const div = document.createElement('div');
   div.className = 'pedido';
   if (p.status === 'finalizado') div.classList.add('finalizado');
@@ -98,50 +154,23 @@ function formatarNumero(raw) {
   if (p.valido === 2) div.classList.add('recusado');
   if (p.valido === 2) p.status = 'finalizado';
 
-  const numero = formatarNumero(p.cliente_numero);
 
   // 🔁 Transformando JSON em texto legível
-  let itensFormatados = '';
-try {
-  const itens = JSON.parse(p.itens);
-  if (Array.isArray(itens)) {
-    itensFormatados = itens.join(', ');
-  } else {
-    itensFormatados = 'Itens inválidos';
-  }
-} catch (e) {
-  itensFormatados = 'Itens inválidos';
-}
+  const itensFormatados = p.produtos || 'Sem produtos';
 
 
 div.innerHTML = `
-    <strong>Pedido #${numero}</strong><br>
-    ${itensFormatados}<br>
+  <strong>Pedido Nº ${numeroPedido}</strong>
+  <small>🕒 ${new Date(p.data_hora).toLocaleTimeString()}</small>
+  <span>📦 ${itensFormatados}</span>
+  ${
+    (p.valido === 1 && !['rua','entrega','finalizado'].includes(p.status))
+    ? `<button onclick="alterarStatus(${p.id}, '${p.status}')">Alterar Status</button>`
+    : ''
+  }
+`;
 
-    ${
-      // Botão “Alterar Status”
-      (p.valido === 1 && !['rua','entrega','finalizado'].includes(p.status))
-      ? `<button onclick="alterarStatus(${p.id}, '${p.status}')">
-           Alterar Status
-         </button>`
-      : ''
-    }
 
-    ${
-      // Botão “Enviar”
-      (p.valido === 1 && p.status === 'entrega' && p.status !== 'finalizado' && p.status !== 'rua')
-      ? `<button
-           id="btnEnviar-${p.id}"
-           style="display: block; color: #fff; border: none;
-                  border-radius: 6px; padding: 0.5rem 1rem;
-                  cursor: pointer; transition: background 0.3s;"
-           onclick="alterarStatus(${p.id}, '${p.status}'); enviarParaEntrega();"
-         >
-           Enviar
-         </button>`
-      : ''
-    }
-  `;
 
 
   document.getElementById('lista-' + p.status).appendChild(div);
@@ -157,16 +186,8 @@ div.innerHTML = `
       document.getElementById('total-vendas').textContent = pedidos.length;
     }
 
-    async function alterarStatus(id, statusAtual) {
-      const podeAlterar = confirm("Deseja realmente alterar o status do pedido?");
-      if (!podeAlterar) return;
-      await fetch(`/alterar_status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, statusAtual })
-      });
-      carregarPedidos();
-    }
+
+
 
 
 
@@ -231,5 +252,15 @@ function mostrarToast(mensagem, sucesso = true) {
     setInterval(carregarPedidos, 15000);
     carregarPedidos();
   </script>
+  <div id="modalConfirm" class="modal" style="display: none;">
+  <div class="modal-content">
+    <p id="modalText">Deseja realmente alterar o status do pedido?</p>
+    <div class="modal-actions">
+      <button id="modalSim">Sim</button>
+      <button id="modalNao">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

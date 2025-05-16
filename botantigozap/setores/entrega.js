@@ -137,7 +137,7 @@ module.exports = async function tratarEntrega(texto, msg, sessao, db, client, nu
     // Busca as formas de pagamento e valores pagos de todos os pedidos da rota de uma vez
     const pedidosIds = distancias.map(item => item.pedido.pedido_id);
     const [vendas] = await db.query(
-      `SELECT id, forma_pagamento, valor_pago FROM vendas WHERE id IN (${pedidosIds.map(() => '?').join(',')})`,
+      `SELECT id, forma_pagamento, valor_total FROM vendas WHERE id IN (${pedidosIds.map(() => '?').join(',')})`,
       pedidosIds
     );
 
@@ -164,7 +164,7 @@ module.exports = async function tratarEntrega(texto, msg, sessao, db, client, nu
       // Verifica a forma de pagamento e adiciona à mensagem, se aplicável
       const venda = vendasMap[pedido.pedido_id];
       if (venda && (venda.forma_pagamento === 'dinheiro' || venda.forma_pagamento === 'pix e dinheiro')) {
-        const valorFormatado = venda.valor_pago ? venda.valor_pago.toFixed(2) : 'N/A';
+        const valorFormatado = venda.valor_total ? venda.valor_total.toFixed(2) : 'N/A';
         resposta += `Forma de Pagamento: ${venda.forma_pagamento} - Valor: R$ ${valorFormatado}\n`;
       }
 
@@ -183,7 +183,7 @@ module.exports = async function tratarEntrega(texto, msg, sessao, db, client, nu
     const pedidoId = sessao.pedidoIdConfirmacao;
     const valorEsperado = sessao.valorEsperado;
 
-    // Verifica se o valor informado pelo entregador corresponde ao valor_pago
+    // Verifica se o valor informado pelo entregador corresponde ao valor_total
     const valorInformado = parseFloat(texto);
     if (isNaN(valorInformado)) {
       return msg.reply('❌ Por favor, informe um valor numérico válido. Exemplo: 50.00');
@@ -246,7 +246,7 @@ module.exports = async function tratarEntrega(texto, msg, sessao, db, client, nu
 
     // Consulta a forma de pagamento na tabela vendas
     const [venda] = await db.query(
-      "SELECT forma_pagamento, valor_pago FROM vendas WHERE id = ?",
+      "SELECT forma_pagamento, valor_total FROM vendas WHERE id = ?",
       [pedidoId]
     );
 
@@ -254,20 +254,20 @@ module.exports = async function tratarEntrega(texto, msg, sessao, db, client, nu
       return msg.reply('⚠️ Pedido não encontrado na tabela de vendas. Não é possível prosseguir.');
     }
 
-    const { forma_pagamento, valor_pago } = venda[0];
+    const { forma_pagamento, valor_total } = venda[0];
 
     // Se o pagamento for "dinheiro" ou "pix e dinheiro", solicita confirmação do valor
     if (forma_pagamento === 'dinheiro' || forma_pagamento === 'pix e dinheiro') {
-      if (!valor_pago) {
+      if (!valor_total) {
         return msg.reply('⚠️ O valor a ser pago não está definido para este pedido. Entre em contato com o suporte.');
       }
 
       sessao.subetapa = 'confirmar_valor';
       sessao.pedidoIdConfirmacao = pedidoId;
-      sessao.valorEsperado = parseFloat(valor_pago);
+      sessao.valorEsperado = parseFloat(valor_total);
       sessoes.set(numero, sessao);
 
-      return msg.reply(`💵 Este pedido foi pago em "${forma_pagamento}". O valor a ser recebido é R$ ${valor_pago.toFixed(2)}. Digite o valor que você recebeu para confirmar.`);
+      return msg.reply(`💵 Este pedido foi pago em "${forma_pagamento}". O valor a ser recebido é R$ ${valor_total.toFixed(2)}. Digite o valor que você recebeu para confirmar.`);
     }
 
     // Se não for "dinheiro" nem "pix e dinheiro", marca diretamente como recebido

@@ -127,7 +127,7 @@
           </ul>
           <p class="menu-label">Logic Ice</p>
           <ul class="menu-list">
-            <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+            <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
             <li><a href="vendas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
             <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
           </ul>
@@ -445,7 +445,7 @@
             row.innerHTML = `
               <td>${venda.id}</td>
               <td>${formatarCliente(venda.cliente_numero)}</td>
-              <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
+              <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
               <td>${venda.forma_pagamento}</td>
               <td>${formatarData(venda.data)}</td>
               <td>${venda.endereco}</td>
@@ -507,7 +507,7 @@
             row.innerHTML = `
               <td>${venda.id}</td>
               <td>${formatarCliente(venda.cliente_numero)}</td>
-              <td>R$ ${parseFloat(venda.valor_pago || 0).toFixed(2)}</td>
+              <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
               <td>${venda.forma_pagamento}</td>
               <td>${formatarData(venda.data)}</td>
               <td>${venda.endereco}</td>
@@ -545,7 +545,7 @@
 async function abrirEditModal(venda) {
   document.getElementById('editId').value = venda.id;
   document.getElementById('editClienteNumero').value = formatarCliente(venda.cliente_numero);
-  document.getElementById('editValorPago').value = parseFloat(venda.valor_pago || 0).toFixed(2);
+  document.getElementById('editValorPago').value = parseFloat(venda.valor_total || 0).toFixed(2);
   document.getElementById('editFormaPagamento').value = venda.forma_pagamento;
   document.getElementById('editData').value = formatarData(venda.data);
   document.getElementById('editEndereco').value = venda.endereco;
@@ -579,12 +579,12 @@ async function salvarEdicao() {
   const vendaId = document.getElementById('editId').value;
   const forma_pagamento = document.getElementById('editFormaPagamento').value;
   const status = document.getElementById('editStatus').value;
-  const valor_pago = parseFloat(document.getElementById('editValorPago').value.replace(',', '.'));
+  const valor_total = parseFloat(document.getElementById('editValorPago').value.replace(',', '.'));
   try {
     const response = await fetch(`/api/vendas/${vendaId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ forma_pagamento, status, valor_pago })
+      body: JSON.stringify({ forma_pagamento, status, valor_total })
     });
     if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
     showNotification('Venda atualizada com sucesso!', 'success');

@@ -272,7 +272,7 @@ const vendedorId = vendedorRows.length ? vendedorRows[0].id : null;
 // Inserir na tabela de vendas com o vendedor_id
 const [result] = await db.query(
   `INSERT INTO vendas 
-    (cliente_numero, itens, forma_pagamento, comprovante, valor_pago, endereco, recebido, status, vendedor_id)
+    (cliente_numero, itens, forma_pagamento, comprovante, valor_total, endereco, recebido, status, vendedor_id)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   [
     sessao.pedido.cliente,

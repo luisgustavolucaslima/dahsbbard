@@ -10,21 +10,39 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
 </head>
+
 <body>
   <script>
+    function mostrarNotificacao(mensagem, tipo = 'is-info', tempo = 4000) {
+  const notif = document.getElementById('notificacao');
+  if (!notif) return;
+
+  notif.className = `notification ${tipo}`;
+  notif.innerHTML = `
+    <button class="delete" onclick="this.parentElement.classList.add('is-hidden')"></button>
+    ${mensagem}
+  `;
+  notif.classList.remove('is-hidden');
+
+  // Oculta após o tempo
+  setTimeout(() => {
+    notif.classList.add('is-hidden');
+  }, tempo);
+}
+
     document.addEventListener("DOMContentLoaded", () => {
       const usuario = localStorage.getItem('usuario');
       const permissao = localStorage.getItem('permissao');
   
       // Verifica se o usuário e permissão estão armazenados no localStorage
       if (!usuario || !permissao) {
-        alert('Você não está autenticado! Redirecionando para o login...');
+        mostrarNotificacao('Você não está autenticado! Redirecionando para o login...', 'is-danger');
         window.location.href = '../login.html'; // Redireciona para a página de login
       }
   
       // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
       if (permissao !== 'admin') {
-        alert('Você não tem permissão para acessar essa área!');
+        mostrarNotificacao('Você não tem permissão para acessar essa área!', 'is-danger');
         window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
       }
     });
@@ -65,7 +83,7 @@
       </ul>
       <p class="menu-label">Logic Ice</p>
       <ul class="menu-list">
-        <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
         <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
         <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
       </ul>
@@ -355,7 +373,7 @@ async function atualizarEstoque(filtros = {}) {
   const tbody = document.getElementById('estoqueTable');
   if (!tbody) {
     console.error('Elemento com ID "estoqueTable" não encontrado no DOM');
-    alert('Erro: Tabela de estoque não encontrada');
+    mostrarNotificacao('Erro: Tabela de estoque não encontrada', 'is-danger');
     return;
   }
   tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Carregando...</td></tr>';
@@ -401,7 +419,7 @@ async function atualizarEstoque(filtros = {}) {
   } catch (error) {
     console.error('Erro ao atualizar estoque:', error);
     tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Erro ao carregar itens: ' + error.message + '</td></tr>';
-    alert('Erro ao carregar estoque: ' + error.message);
+    mostrarNotificacao('Erro ao carregar estoque: ' + error.message, 'is-danger');
   }
 }
 
@@ -421,7 +439,7 @@ async function carregarCategorias() {
     return categorias;
   } catch (error) {
     console.error('Erro ao carregar categorias:', error);
-    alert('Não foi possível carregar as categorias: ' + error.message);
+    mostrarNotificacao('Não foi possível carregar as categorias: ', 'is-danger');
     return [];
   }
 }
@@ -452,7 +470,7 @@ async function addCategoria() {
   const novaCategoria = novaCategoriaInput?.value.trim();
 
   if (!novaCategoria) {
-    alert('Por favor, insira o nome da nova categoria');
+    mostrarNotificacao('Por favor, insira o nome da nova categoria', 'is-warning');
     return;
   }
 
@@ -467,7 +485,7 @@ async function addCategoria() {
       throw new Error(errorData.error || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
     const data = await response.json();
-    alert(data.mensagem);
+    mostrarNotificacao(`${data.mensagem}`, 'is-success');
     novaCategoriaInput.value = '';
     const categorias = await carregarCategorias();
     const selectAddCategoria = document.getElementById('addCategoria');
@@ -490,7 +508,7 @@ async function addCategoria() {
     }
   } catch (error) {
     console.error('Erro ao adicionar categoria:', error);
-    alert('Erro ao adicionar categoria: ' + error.message);
+    mostrarNotificacao('Erro ao adicionar categoria: ', 'is-danger');
   }
 }
 
@@ -532,7 +550,7 @@ async function salvarNovoItem() {
   const categoria = document.getElementById('addCategoria')?.value;
 
   if (!nome || isNaN(quantidade) || isNaN(preco) || !categoria || !medida || !categoria) {
-    alert('Preencha todos os campos corretamente');
+    mostrarNotificacao('Preencha todos os campos corretamente', 'is-warning');
     return;
   }
 
@@ -546,12 +564,12 @@ async function salvarNovoItem() {
       const errorData = await response.json();
       throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    alert('Item adicionado com sucesso!');
+    mostrarNotificacao('Item adicionado com sucesso!', 'is-success');
     closeAddModal();
     atualizarEstoque();
   } catch (error) {
     console.error('Erro ao adicionar item:', error);
-    alert('Erro ao adicionar item: ' + error.message);
+    mostrarNotificacao('Erro ao adicionar item: ' + error.message, 'is-danger');
   }
 }
 
@@ -592,7 +610,7 @@ async function salvarEdicao() {
   const categoria = document.getElementById('editCategoria')?.value;
 
   if (!id || !nome || isNaN(quantidade) || isNaN(preco) || !categoria) {
-    alert('Preencha todos os campos corretamente');
+    mostrarNotificacao('Preencha todos os campos corretamente', 'is-warning');
     return;
   }
 
@@ -606,27 +624,29 @@ async function salvarEdicao() {
       const errorData = await response.json();
       throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    alert('Item atualizado com sucesso!');
+    mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
     closeEditModal();
     atualizarEstoque();
   } catch (error) {
     console.error('Erro ao atualizar item:', error);
-    alert('Erro ao atualizar item: ' + error.message);
+    mostrarNotificacao('Erro ao atualizar item: ', 'is-danger');
+
   }
 }
 
 // Função para confirmar deleção
 function confirmarDelecao() {
-  if (confirm('Tem certeza que deseja deletar este item?')) {
-    deletarItem();
-  }
+  abrirModalConfirmacao('Tem certeza que deseja deletar?', () => {
+  deletarItem();
+});
+
 }
 
 // Função para deletar item
 async function deletarItem() {
   const id = document.getElementById('editId')?.value;
   if (!id) {
-    alert('ID do item não encontrado');
+    mostrarNotificacao('ID do item não encontrado', 'is-warning');
     return;
   }
   try {
@@ -638,12 +658,12 @@ async function deletarItem() {
       const errorData = await response.json();
       throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
     }
-    alert('Item deletado com sucesso!');
+    mostrarNotificacao('Item deletado com sucesso!', 'is-success');
     closeEditModal();
     atualizarEstoque();
   } catch (error) {
     console.error('Erro ao deletar item:', error);
-    alert('Erro ao deletar item: ' + error.message);
+    mostrarNotificacao('Erro ao deletar item: ', 'is-danger');
   }
 }
 
@@ -745,9 +765,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch (error) {
     console.error('Erro na inicialização:', error);
-    alert('Erro na inicialização da página: ' + error.message);
+    mostrarNotificacao('Erro na inicialização da página: ', 'is-danger');
   }
 });
+let callbackConfirmacao = null;
+
+function abrirModalConfirmacao(mensagem, callback) {
+  document.getElementById("mensagemConfirmacao").textContent = mensagem;
+  document.getElementById("modalConfirmacao").classList.add("is-active");
+  callbackConfirmacao = callback;
+}
+
+function fecharModalConfirmacao() {
+  document.getElementById("modalConfirmacao").classList.remove("is-active");
+  callbackConfirmacao = null;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnConfirmar").addEventListener("click", () => {
+    if (typeof callbackConfirmacao === "function") callbackConfirmacao();
+    fecharModalConfirmacao();
+  });
+});
+
 </script>
 
 <!-- Scripts below are for demo only -->
@@ -755,5 +795,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
 <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+<div id="notificacao" class="notification is-hidden" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; max-width: 300px;"></div>
+<!-- Modal de Confirmação -->
+<div class="modal" id="modalConfirmacao">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Confirmação</p>
+      <button class="delete" aria-label="close" onclick="fecharModalConfirmacao()"></button>
+    </header>
+    <section class="modal-card-body" id="mensagemConfirmacao">
+      Você tem certeza?
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" id="btnConfirmar">Sim</button>
+      <button class="button" onclick="fecharModalConfirmacao()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+
 </body>
 </html>

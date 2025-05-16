@@ -1,4 +1,7 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const mysql = require('mysql2/promise');
 const app = express();
 const port = 3000;
@@ -18,18 +21,26 @@ app.use(express.json());
 app.get('/pedidos_diarios', async (req, res) => {
   try {
     const [pedidos] = await db.query(`
-      SELECT 
-        pd.id, pd.cliente_numero, pd.status, pd.valido, pd.data_hora, pd.data, 
-        pd.endereco, pd.recebido, pd.venda_id,
-        GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as produtos,
-        v.valor_total
-      FROM pedidos_diarios pd
-      LEFT JOIN vendas v ON pd.venda_id = v.id
-      LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
-      LEFT JOIN estoque e ON pi.produto_id = e.id
-      WHERE DATE(pd.data) = CURDATE()
-      GROUP BY pd.id
-      ORDER BY pd.data DESC
+              SELECT 
+          pd.id, 
+          pd.cliente_numero, 
+          pd.status, 
+          pd.valido, 
+          pd.data_hora, 
+          pd.data, 
+          pd.endereco, 
+          pd.recebido, 
+          pd.venda_id,
+          GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as produtos,
+          v.valor_total,
+          ROW_NUMBER() OVER (ORDER BY pd.data_hora ASC) as pedido_numero
+        FROM pedidos_diarios pd
+        LEFT JOIN vendas v ON pd.venda_id = v.id
+        LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
+        LEFT JOIN estoque e ON pi.produto_id = e.id
+        WHERE DATE(pd.data) = CURDATE()
+        GROUP BY pd.id
+        ORDER BY pd.data_hora ASC
     `);
     res.json(pedidos);
   } catch (err) {
@@ -37,6 +48,17 @@ app.get('/pedidos_diarios', async (req, res) => {
     res.status(500).json({ erro: 'Erro ao buscar pedidos' });
   }
 });
+
+app.get('/api/produtos', async (req, res) => {
+  try {
+    const [produtos] = await db.query('SELECT id, nome, valor_unitario FROM estoque');
+    res.json(produtos);
+  } catch (e) {
+    console.error('Erro ao buscar produtos:', e);
+    res.status(500).json({ erro: 'Erro ao carregar produtos' });
+  }
+});
+
 
 // Rota para alterar status do pedido
 app.post('/alterar_status', async (req, res) => {
@@ -193,7 +215,7 @@ app.get('/api/vendas-por-cliente', async (req, res) => {
       SELECT 
         cliente_numero,
         COUNT(*) AS total_vendas,
-        SUM(valor_pago) AS valor_total,
+        SUM(valor_total) AS valor_total,
         MAX(data) AS ultima_compra
       FROM vendas
       ${busca ? 'WHERE cliente_numero LIKE ?' : ''}
@@ -267,10 +289,10 @@ app.get('/api/dashboard', async (req, res) => {
     const [[vendasInfo]] = await db.query(`
       SELECT 
         COUNT(*) AS totalVendas, 
-        SUM(valor_pago) AS totalReceita,
-        AVG(valor_pago) AS valorMedio
+        SUM(valor_total) AS totalReceita,
+        AVG(valor_total) AS valorMedio
       FROM vendas
-      WHERE DATE(data) = CURDATE()
+      WHERE DATE(data) = CURDATE() 
     `);
     const [[baixoEstoque]] = await db.query(`
       SELECT COUNT(*) AS baixoEstoque
@@ -281,7 +303,7 @@ app.get('/api/dashboard', async (req, res) => {
       SELECT 
         cliente_numero,
         COUNT(*) AS total_compras,
-        SUM(valor_pago) AS valor_total,
+        SUM(valor_total) AS valor_total,
         MAX(data) AS ultima_compra
       FROM vendas
       GROUP BY cliente_numero
@@ -296,7 +318,7 @@ app.get('/api/dashboard', async (req, res) => {
       FROM pedido_itens pi
       JOIN pedidos_diarios pd ON pi.pedido_id = pd.id
       JOIN estoque e ON pi.produto_id = e.id
-      WHERE DATE(pd.data) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      WHERE DATE(pd.data) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
       GROUP BY e.id, e.nome, e.valor_unitario, e.categoria
       ORDER BY quantidade_vendida DESC
       LIMIT 5
@@ -311,9 +333,9 @@ app.get('/api/dashboard', async (req, res) => {
     const [vendasDiarias] = await db.query(`
       SELECT 
         DATE(data) AS data,
-        SUM(valor_pago) AS receita
+        SUM(valor_total) AS receita
       FROM vendas
-      WHERE DATE(data) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      WHERE DATE(data) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
       GROUP BY DATE(data)
       ORDER BY data
     `);
@@ -513,7 +535,7 @@ app.get('/api/vendas', async (req, res) => {
       SELECT 
         v.id,
         COALESCE(v.cliente_numero, '') AS cliente_numero,
-        COALESCE(v.valor_pago, 0) AS valor_pago,
+        COALESCE(v.valor_total, 0) AS valor_total,
         COALESCE(v.forma_pagamento, 'pix') AS forma_pagamento,
         COALESCE(v.data, NOW()) AS data,
         COALESCE(v.endereco, '') AS endereco,
@@ -536,16 +558,132 @@ app.get('/api/vendas', async (req, res) => {
   }
 });
 
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Rota ajustada para criação de pedido sem obrigatoriedade de valor_pago, exceto para pagamentos em dinheiro ou pix+dinheiro
+app.post('/api/pedido_manual', upload.single('comprovante'), async (req, res) => {
+  const { cliente_numero, forma_pagamento, endereco, itens, valor_pago, valor_dinheiro } = req.body;
+  let itensParsed;
+try {
+  itensParsed = typeof itens === 'string' ? JSON.parse(itens) : itens;
+} catch (e) {
+  return res.status(400).json({ mensagem: 'Itens do pedido estão em formato inválido.' });
+}
+  const validPaymentMethods = ['pix', 'dinheiro', 'pix+dinheiro'];
+
+  if (
+    !cliente_numero ||
+    !forma_pagamento ||
+    !validPaymentMethods.includes(forma_pagamento) ||
+    !endereco ||
+    !Array.isArray(itensParsed) ||
+    itensParsed.length === 0
+  ) {
+    return res.status(400).json({ mensagem: 'Dados incompletos ou forma de pagamento inválida.' });
+  }
+
+  // valor_pago e valor_dinheiro só são exigidos se for dinheiro ou Pix+dinheiro
+  if (forma_pagamento === 'pix+dinheiro' || forma_pagamento === 'dinheiro') {
+    if (!valor_pago || isNaN(valor_pago)) {
+      return res.status(400).json({ mensagem: 'Valor total pago é obrigatório para dinheiro ou PIX + dinheiro.' });
+    }
+    if (forma_pagamento === 'pix+dinheiro' && (!valor_dinheiro || isNaN(valor_dinheiro))) {
+      return res.status(400).json({ mensagem: 'Valor em dinheiro é obrigatório para PIX + dinheiro.' });
+    }
+  }
+
+  const conn = await db.getConnection();
+  await conn.beginTransaction();
+
+  try {
+    // Verificar estoque
+    for (const item of itensParsed) {
+      const [[estoque]] = await conn.query(`SELECT quantidade FROM estoque WHERE id = ?`, [item.produto_id]);
+      if (!estoque || estoque.quantidade < item.quantidade) {
+        await conn.rollback().catch(() => {});
+        return res.status(400).json({ mensagem: `Estoque insuficiente para o produto ${item.produto_id}` });
+      }
+    }
+
+    // Calcular total
+    let valor_total = 0;
+    for (const item of itensParsed) {
+      const [[produto]] = await conn.query('SELECT valor_unitario FROM estoque WHERE id = ?', [item.produto_id]);
+      valor_total += parseFloat(produto.valor_unitario) * item.quantidade;
+    }
+
+    // Comprovante
+    let comprovanteFile = null;
+    if (req.file) {
+      if (!['image/jpeg', 'image/png'].includes(req.file.mimetype)) {
+        await conn.rollback().catch(() => {});
+        return res.status(400).json({ mensagem: 'Comprovante inválido. Envie JPG ou PNG.' });
+      }
+      comprovanteFile = req.file.buffer;
+    }
+
+    // Inserir venda
+    const [venda] = await conn.query(`
+      INSERT INTO vendas (cliente_numero, forma_pagamento, comprovante, valor_total, valor_pago, valor_dinheiro, endereco, status, data, lancameto)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'novo', NOW(), 'manual')
+    `, [
+      cliente_numero,
+      forma_pagamento,
+      comprovanteFile,
+      valor_total,
+      (forma_pagamento === 'pix+dinheiro' || forma_pagamento === 'dinheiro') ? parseFloat(valor_pago || 0) : null,
+      (forma_pagamento === 'pix+dinheiro') ? parseFloat(valor_dinheiro || 0) : null,
+      endereco
+    ]);
+
+    const vendaId = venda.insertId;
+
+    // Inserir pedido
+    const [pedido] = await conn.query(`
+      INSERT INTO pedidos_diarios (cliente_numero, venda_id, data, endereco, status, valido)
+      VALUES (?, ?, NOW(), ?, 'novo', 0)
+    `, [cliente_numero, vendaId, endereco]);
+
+    const pedidoId = pedido.insertId;
+
+    // Inserir itens + baixar estoque
+    for (const item of itensParsed) {
+      await conn.query(`
+        INSERT INTO pedido_itens (pedido_id, produto_id, quantidade)
+        VALUES (?, ?, ?)
+      `, [pedidoId, item.produto_id, item.quantidade]);
+
+      await conn.query(`
+        UPDATE estoque SET quantidade = quantidade - ? WHERE id = ?
+      `, [item.quantidade, item.produto_id]);
+    }
+
+    await conn.commit();
+    res.json({ mensagem: 'Pedido criado com sucesso!', pedido_id: pedidoId });
+
+  } catch (erro) {
+    await conn.rollback().catch(() => {});
+    console.error('Erro ao processar pedido:', erro);
+    res.status(500).json({ mensagem: 'Erro interno ao salvar o pedido.', erro: erro.message });
+  } finally {
+    conn.release();
+  }
+});
+
+
+
+
+
 app.patch('/api/vendas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { forma_pagamento, status, valor_pago } = req.body;
-    if (!forma_pagamento || !status || valor_pago === undefined || valor_pago === '') {
+    const { forma_pagamento, status, valor_total } = req.body;
+    if (!forma_pagamento || !status || valor_total === undefined || valor_total === '') {
       return res.status(400).json({ erro: 'Forma de pagamento, status e valor são obrigatórios' });
     }
     const [result] = await db.query(
-      'UPDATE vendas SET forma_pagamento = ?, status = ?, valor_pago = ? WHERE id = ?',
-      [forma_pagamento, status, valor_pago, id]
+      'UPDATE vendas SET forma_pagamento = ?, status = ?, valor_total = ? WHERE id = ?',
+      [forma_pagamento, status, valor_total, id]
     );
     if (result.affectedRows === 0) {
       return res.status(404).json({ erro: 'Venda não encontrada' });
@@ -1131,6 +1269,106 @@ app.get('/api/entregasmetricas', async (req, res) => {
     res.status(500).json({ erro: `Falha ao buscar métricas. Detalhes: ${err.message}` });
   }
 });
+
+app.post('/editar_pagamento', async (req, res) => {
+  const { id, forma_pagamento } = req.body;
+  try {
+    await db.query('UPDATE vendas SET forma_pagamento = ? WHERE id = ?', [forma_pagamento, id]);
+    res.json({ mensagem: 'Forma de pagamento atualizada com sucesso!' });
+  } catch (err) {
+    console.error('Erro ao editar forma de pagamento:', err);
+    res.status(500).json({ erro: 'Erro ao editar forma de pagamento' });
+  }
+});
+
+
+app.post('/editar_itens', async (req, res) => {
+  const { pedido_id, itens } = req.body;
+
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return res.status(400).json({ erro: 'Itens inválidos' });
+  }
+
+  try {
+    // Remove os itens anteriores do pedido
+    await db.query('DELETE FROM pedido_itens WHERE pedido_id = ?', [pedido_id]);
+
+    // Adiciona os novos itens
+    for (const item of itens) {
+      const { produto_id, quantidade } = item;
+      if (produto_id && quantidade > 0) {
+        await db.query(
+          'INSERT INTO pedido_itens (pedido_id, produto_id, quantidade) VALUES (?, ?, ?)',
+          [pedido_id, produto_id, quantidade]
+        );
+      }
+    }
+
+    res.json({ mensagem: 'Itens do pedido atualizados com sucesso!' });
+  } catch (err) {
+    console.error('Erro ao editar itens do pedido:', err);
+    res.status(500).json({ erro: 'Erro ao editar itens do pedido' });
+  }
+});
+
+app.get('/api/pedidos/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [resultado] = await db.query(`
+      SELECT 
+        pd.id AS pedido_id,
+        pd.cliente_numero,
+        pd.endereco,
+        pd.status,
+        pd.data_hora AS data_pedido,
+        COALESCE(v.forma_pagamento, '-') AS forma_pagamento,
+        COALESCE(v.valor_total, '-') AS valor_total,
+        GROUP_CONCAT(CONCAT(pi.quantidade, 'x ', e.nome) SEPARATOR ', ') AS itens
+      FROM pedidos_diarios pd
+      LEFT JOIN vendas v ON v.id = pd.venda_id
+      LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
+      LEFT JOIN estoque e ON e.id = pi.produto_id
+      WHERE pd.id = ?
+      GROUP BY pd.id
+      LIMIT 1
+    `, [id]);
+
+    if (!resultado || resultado.length === 0) {
+      return res.status(404).json({ erro: "Pedido não encontrado" });
+    }
+
+    res.json(resultado[0]);
+  } catch (err) {
+    console.error("Erro ao buscar detalhes do pedido:", err);
+    res.status(500).json({ erro: "Erro ao buscar pedido" });
+  }
+});
+
+
+// Rota para listar pedidos pendentes (valido = 0)
+app.get('/api/pedidos_pendentes', async (req, res) => {
+  try {
+    const [pedidos] = await db.query(`
+      SELECT 
+          pd.id,
+          pd.cliente_numero,
+          pd.status,
+          pd.valido,
+          pd.venda_id,
+          v.valor_total AS valor_total
+      FROM pedidos_diarios pd
+      LEFT JOIN vendas v ON pd.venda_id = v.id
+      WHERE pd.valido IS NULL
+      ORDER BY pd.data_hora DESC
+    `);
+    res.json(pedidos);
+  } catch (err) {
+    console.error('Erro ao buscar pedidos pendentes:', err);
+    res.status(500).json({ erro: 'Erro ao buscar pedidos pendentes' });
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`🟢 Servidor rodando em http://localhost:${port}`);

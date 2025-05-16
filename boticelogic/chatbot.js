@@ -9,9 +9,9 @@ const SENHA_MESTRE = '#acesso123';
 const tratarEntrega = require('./setores/entrega');
 const tratarVendas = require('./setores/vendas');
 
-// Timeout de sessão (15 minutos em milissegundos)
-const SESSION_TIMEOUT = 15 * 60 * 1000;
-const MESSAGE_TIMEOUT = 30000; // 30 segundos para exclusão de mensagens
+// Configurações de timeout
+const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutos
+const MESSAGE_TIMEOUT = 300000; // 30 segundos para exclusão de mensagens
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const db = mysql.createPool({
@@ -112,14 +112,13 @@ const limparMensagensChat = async (chatId) => {
   try {
     console.log(`[DEBUG] Iniciando limpeza de mensagens para chatId: ${chatId}`);
     
-    // Enviar uma mensagem temporária para obter um message_id recente
     const tempMessage = await bot.sendMessage(chatId, '🧹 Iniciando limpeza...', { parse_mode: 'Markdown' });
     let messageId = tempMessage.message_id;
-    await bot.deleteMessage(chatId, messageId); // Deletar a mensagem temporária
+    await bot.deleteMessage(chatId, messageId);
     
     let mensagensDeletadas = 0;
-    const maxMensagens = 100; // Limite para evitar sobrecarga
-    const minMessageId = Math.max(1, messageId - maxMensagens); // Evitar IDs negativos
+    const maxMensagens = 100;
+    const minMessageId = Math.max(1, messageId - maxMensagens);
 
     while (messageId >= minMessageId && mensagensDeletadas < maxMensagens) {
       try {
@@ -127,7 +126,6 @@ const limparMensagensChat = async (chatId) => {
         mensagensDeletadas++;
         console.log(`[DEBUG] Mensagem ${messageId} deletada com sucesso.`);
       } catch (err) {
-        // Ignorar erros esperados
         if (err.message.includes('message to delete not found') || 
             err.message.includes('message can\'t be deleted') || 
             err.message.includes('Too Many Requests')) {
@@ -136,8 +134,7 @@ const limparMensagensChat = async (chatId) => {
           console.error(`[ERROR] Erro inesperado ao deletar mensagem ${messageId}:`, err.message);
         }
       }
-      messageId--; // Decrementar para tentar a próxima mensagem
-      // Pequena pausa para evitar rate limiting
+      messageId--;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
@@ -149,27 +146,69 @@ const limparMensagensChat = async (chatId) => {
   }
 };
 
+// Função para executar queries com timeout
+const queryWithTimeout = async (query, params, timeout = 5000) => {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Query timeout')), timeout);
+  });
+  return Promise.race([
+    db.query(query, params),
+    timeoutPromise
+  ]);
+};
+
 // Listener para capturar o número de telefone
 bot.on('contact', async (msg) => {
+  console.log('[DEBUG] Evento contact recebido:', JSON.stringify(msg, null, 2));
   const chatId = msg.chat?.id?.toString();
   const phoneNumber = msg.contact?.phone_number;
 
   if (!chatId || !phoneNumber) {
-    console.error('[ERROR] Contato inválido:', msg);
+    console.error('[ERROR] Contato inválido:', { chatId, phoneNumber, msg });
     return enviarMensagem(chatId, '⚠️ *Número de telefone inválido. Tente novamente.*');
   }
 
+  let sessao = sessoes.get(chatId) || {
+    setor: null,
+    data: moment().format('YYYY-MM-DD'),
+    autenticado: false,
+    logado: false,
+    usuario_id: null,
+    cargo: null,
+    lastUpdated: Date.now()
+  };
+
   try {
-    await db.query('UPDATE usuarios SET numero = ? WHERE chat_id = ?', [phoneNumber, chatId]);
+    // Verificar se o usuário existe
+    const [usuarios] = await queryWithTimeout('SELECT id FROM usuarios WHERE chat_id = ?', [chatId]);
+    if (!usuarios.length) {
+      console.error(`[ERROR] Usuário não encontrado para chatId ${chatId}`);
+      return enviarMensagem(chatId, '⚠️ *Usuário não encontrado. Tente registrar novamente.*');
+    }
+
+    console.log(`[DEBUG] Atualizando número ${phoneNumber} para chatId ${chatId}`);
+    const [result] = await queryWithTimeout('UPDATE usuarios SET numero = ? WHERE chat_id = ?', [phoneNumber, chatId]);
+    console.log(`[DEBUG] Resultado da query:`, result);
+
+    // Atualizar sessão
+    sessao.usuario_id = usuarios[0].id;
+    sessao.lastUpdated = Date.now();
+    sessoes.set(chatId, sessao);
+
     await enviarMensagem(chatId, `✅ *Número ${phoneNumber} salvo com sucesso!* Agora, envie sua *senha pessoal* (mínimo 4 caracteres).`);
   } catch (err) {
-    console.error(`[ERROR] Erro ao salvar número de telefone para ${chatId}:`, err.message);
+    console.error(`[ERROR] Erro ao salvar número de telefone para ${chatId}:`, err.message, err.stack);
     await enviarMensagem(chatId, '⚠️ *Erro ao salvar o número de telefone. Tente novamente.*');
   }
 });
 
 // Manipula mensagens (texto, fotos, etc.)
 bot.on('message', async (msg) => {
+  if (msg.contact) {
+    console.log('[DEBUG] Ignorando mensagem de contato no manipulador de mensagem:', msg);
+    return;
+  }
+
   const chatId = msg.chat.id.toString();
   const hoje = moment().format('YYYY-MM-DD');
   let sessao = sessoes.get(chatId) || {
@@ -215,7 +254,7 @@ bot.on('message', async (msg) => {
   // Consulta usuários
   let usuarios;
   try {
-    [usuarios] = await db.query('SELECT id, numero, senha, cargo, nome, ultima_sessao FROM usuarios WHERE chat_id = ?', [chatId]);
+    [usuarios] = await queryWithTimeout('SELECT id, numero, senha, cargo, nome, ultima_sessao FROM usuarios WHERE chat_id = ?', [chatId]);
   } catch (err) {
     console.error(`[ERROR] Erro ao consultar usuários para ${chatId}:`, err.message);
     return enviarMensagem(chatId, '⚠️ *Erro ao acessar o sistema. Tente novamente.*');
@@ -227,7 +266,7 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '🔒 *Envie a senha de acesso para se registrar.*');
     }
     try {
-      const [result] = await db.query(
+      const [result] = await queryWithTimeout(
         'INSERT INTO usuarios (chat_id, senha, cargo, ultima_sessao, data_registro) VALUES (?, ?, ?, ?, ?)',
         [chatId, null, null, hoje, hoje]
       );
@@ -258,7 +297,7 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '❗ *A senha deve ter pelo menos 4 caracteres.*');
     }
     try {
-      await db.query(
+      await queryWithTimeout(
         'UPDATE usuarios SET senha = SHA2(?, 256), ultima_sessao = ? WHERE chat_id = ?',
         [msg.text, hoje, chatId]
       );
@@ -278,7 +317,7 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '🔒 *Envie sua senha pessoal para acessar.*');
     }
     try {
-      const [rows] = await db.query(
+      const [rows] = await queryWithTimeout(
         'SELECT id, cargo, nome FROM usuarios WHERE chat_id = ? AND senha = SHA2(?, 256)',
         [chatId, msg.text]
       );
@@ -307,7 +346,7 @@ bot.on('message', async (msg) => {
     }
 
     try {
-      const [setores] = await db.query(
+      const [setores] = await queryWithTimeout(
         'SELECT senha_setor FROM setores WHERE nome_setor = ?',
         [sessao.setor]
       );
@@ -340,7 +379,6 @@ bot.on('message', async (msg) => {
     try {
       switch (sessao.setor.toLowerCase()) {
         case 'vendas':
-          // Passa a mensagem completa (que pode conter texto ou foto)
           return await tratarVendas(msg.text || '', msg, sessao, db, bot);
         case 'entrega':
           return await tratarEntrega(msg.text || '', msg, sessao, db, bot, chatId, sessoes);
@@ -393,7 +431,6 @@ bot.on('callback_query', async (query) => {
   }
 
   try {
-    // Verifica se o usuário está no setor vendas e autenticado
     if (sessao.setor === 'vendas' && sessao.autenticado) {
       bot.answerCallbackQuery(query.id);
       return await tratarVendas(query, { chat: { id: chatId } }, sessao, db, bot);
@@ -414,7 +451,6 @@ bot.on('callback_query', async (query) => {
         bot.answerCallbackQuery(query.id);
         return enviarMensagem(chatId, '⚠️ *Setor inválido. Escolha novamente.*');
       }
-      // Valida se o setor é permitido pelo cargo
       const cargoNormalizado = sessao.cargo?.toLowerCase();
       if (
         (setor === 'vendas' && cargoNormalizado !== 'vendedor') ||

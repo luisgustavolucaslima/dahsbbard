@@ -68,7 +68,7 @@
       </ul>
       <p class="menu-label">Logic Ice</p>
       <ul class="menu-list">
-        <li><a href="../producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
         <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
         <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
       </ul>
@@ -676,9 +676,10 @@ async function salvarEdicao() {
 
 // Função para confirmar deleção
 function confirmarDelecao() {
-  if (confirm('Tem certeza que deseja deletar esta despesa?')) {
-    deletarDespesa();
-  }
+  abrirModalConfirmacao('Tem certeza que deseja deletar?', () => {
+  deletarDespesa();
+});
+
 }
 
 // Função para deletar despesa
@@ -802,6 +803,41 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Erro na inicialização da página: ' + error.message, 'error');
   }
 });
+let callbackConfirmacao = null;
+
+function abrirModalConfirmacao(mensagem, callback) {
+  document.getElementById("mensagemConfirmacao").textContent = mensagem;
+  document.getElementById("modalConfirmacao").classList.add("is-active");
+  callbackConfirmacao = callback;
+}
+
+function fecharModalConfirmacao() {
+  document.getElementById("modalConfirmacao").classList.remove("is-active");
+  callbackConfirmacao = null;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnConfirmar").addEventListener("click", () => {
+    if (typeof callbackConfirmacao === "function") callbackConfirmacao();
+    fecharModalConfirmacao();
+  });
+});
 </script>
+<!-- Modal de Confirmação -->
+<div class="modal" id="modalConfirmacao">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Confirmação</p>
+      <button class="delete" aria-label="close" onclick="fecharModalConfirmacao()"></button>
+    </header>
+    <section class="modal-card-body" id="mensagemConfirmacao">
+      Você tem certeza?
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" id="btnConfirmar">Sim</button>
+      <button class="button" onclick="fecharModalConfirmacao()">Cancelar</button>
+    </footer>
+  </div>
 </body>
 </html>

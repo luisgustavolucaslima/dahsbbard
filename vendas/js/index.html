@@ -115,7 +115,6 @@
           <ul class="menu-list">
             <li><a href="index.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
             <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
-              <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
           </ul>
         </div>
       </aside>
@@ -228,161 +227,31 @@
         </div>
       </footer>
     </div>
-    
-    <script>
-
-
-function verComprovante(id) {
-  fetch(`/comprovante/${id}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.image) {
-        const win = window.open("", "_blank");
-        win.document.write(`
-          <html>
-            <head>
-              <title>Comprovante do Pedido #${id}</title>
-              <style>
-                body {
-                  background: #f4f4f4;
-                  margin: 0;
-                  padding: 0;
-                  font-family: Arial, sans-serif;
-                  display: flex;
-                  flex-direction: column;
-                  align-items: center;
-                }
-                header {
-                  position: sticky;
-                  top: 0;
-                  width: 100%;
-                  padding: 16px;
-                  background-color: #ffffff;
-                  border-bottom: 1px solid #ddd;
-                  text-align: center;
-                  font-size: 20px;
-                  font-weight: bold;
-                  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-                  z-index: 1000;
-                }
-                #content {
-                  margin-top: 30px;
-                  padding: 20px;
-                  display: flex;
-                  justify-content: center;
-                }
-                img {
-                  max-width: 90vw;
-                  max-height: 80vh;
-                  border: 2px solid #ccc;
-                  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-                  border-radius: 8px;
-                }
-                button#printBtn {
-                  position: absolute;
-                  top: 16px;
-                  right: 16px;
-                  background: #3273dc;
-                  color: white;
-                  border: none;
-                  padding: 8px 12px;
-                  border-radius: 4px;
-                  cursor: pointer;
-                  font-size: 14px;
-                }
-                @media (prefers-color-scheme: dark) {
-                  body {
-                    background: #1e1e1e;
-                    color: #eee;
-                  }
-                  header {
-                    background-color: #2b2b2b;
-                    color: #eee;
-                    border-bottom-color: #444;
-                  }
-                  img {
-                    border-color: #444;
-                  }
-                }
-              </style>
-            </head>
-            <body>
-              <header>
-                Comprovante do Pedido #${id}
-                <button id="printBtn" onclick="window.print()">🖨 Imprimir</button>
-              </header>
-              <div id="content">Carregando comprovante...</div>
-              <script>
-                const img = new Image();
-                img.src = "${data.image}";
-                img.onload = () => {
-                  const content = document.getElementById("content");
-                  content.innerHTML = "";
-                  content.appendChild(img);
-                };
-              <\/script>
-            </body>
-          </html>
-        `);
-        win.document.close();
-      } else {
-        showNotification("Comprovante não encontrado.", "warning");
+    <script type="text/javascript" src="js/main.min.js">
+      function verComprovante(id) {
+        fetch(`/comprovante/${id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.image) {
+              const win = window.open();
+              win.document.write('<img src="' + data.image + '" style="max-width:100%">');
+            } else {
+              showNotification('Comprovante não encontrado.', 'warning');
+            }
+          })
+          .catch(() => showNotification('Erro ao buscar comprovante.', 'danger'));
       }
-    })
-    .catch(() => {
-      showNotification("Erro ao buscar comprovante.", "danger");
-    });
-}
 
-       async function salvarPagamento() {
-          const forma = document.getElementById("formaPagamentoInput").value;
+      function editarPagamento(id) {
+        showNotification("Editar forma de pagamento do pedido #" + id + " (em breve)", "info");
+      }
 
-          if (!forma) {
-            showNotification("Escolha uma forma de pagamento.", "warning");
-            return;
-          } async function salvarPagamento() {
-          const forma = document.getElementById("formaPagamentoInput").value;
+      function editarItens(id) {
+        showNotification("Editar itens do pedido #" + id + " (em breve)", "info");
+      }
 
-          if (!forma) {
-            showNotification("Escolha uma forma de pagamento.", "warning");
-            return;
-          }
-
-          try {
-            const response = await fetch("/editar_pagamento", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id: pedidoIdParaPagamento, forma_pagamento: forma })
-            });
-
-            if (!response.ok) throw new Error("Erro ao atualizar pagamento.");
-
-            showNotification("Forma de pagamento atualizada com sucesso!", "success");
-            fecharModalPagamento();
-            atualizarVendas(); // ou outra função de refresh da lista
-          } catch (error) {
-            showNotification("Erro ao atualizar pagamento: " + error.message, "danger");
-          }
-        }
-
-
-          try {
-            const response = await fetch("/editar_pagamento", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id: pedidoIdParaPagamento, forma_pagamento: forma })
-            });
-
-            if (!response.ok) throw new Error("Erro ao atualizar pagamento.");
-
-            showNotification("Forma de pagamento atualizada com sucesso!", "success");
-            fecharModalPagamento();
-            atualizarVendas(); // ou outra função de refresh da lista
-          } catch (error) {
-            showNotification("Erro ao atualizar pagamento: " + error.message, "danger");
-          }
-        }
-
+</script>
+    <script>
       // Funções de Notificação
       function showNotification(message, type = 'info') {
         const container = document.getElementById('notification-container');
@@ -452,7 +321,6 @@ function verComprovante(id) {
                 <button class="button is-small is-danger" onclick="negarPedido(${pedido.id})">❌</button>
                 <button class="button is-small is-warning" onclick="editarPagamento(${pedido.id})">💳</button>
                 <button class="button is-small is-info" onclick="editarItens(${pedido.id})">🧾</button>
-                <button class="button is-small is-info" onclick="informacoesDoPedido(${pedido.id})">🔍 Ver Pedido</button>
               </td>
             `;
             tbody.appendChild(row);
@@ -460,9 +328,9 @@ function verComprovante(id) {
           if (pedidos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered">Nenhum pedido pendente</td></tr>';
           }
-        } catch (err) {
-    showNotification("Erro: " + err.message, "danger");
-  }
+        } catch (error) {
+          showNotification('Erro ao carregar pedidos pendentes: ' + error.message, 'danger');
+        }
       }
 
       // Aprovar Pedido
@@ -476,9 +344,9 @@ function verComprovante(id) {
           if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
           showNotification('Pedido aprovado com sucesso!', 'success');
           atualizarPedidosPendentes();
-        } catch (err) {
-    showNotification("Erro: " + err.message, "danger");
-  }
+        } catch (error) {
+          showNotification('Erro ao aprovar pedido: ' + error.message, 'danger');
+        }
       }
 
       // Negar Pedido
@@ -492,9 +360,9 @@ function verComprovante(id) {
           if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
           showNotification('Pedido negado com sucesso!', 'success');
           atualizarPedidosPendentes();
-        } catch (err) {
-    showNotification("Erro: " + err.message, "danger");
-  }
+        } catch (error) {
+          showNotification('Erro ao negar pedido: ' + error.message, 'danger');
+        }
       }
 
       // Atualizar Vendas (somente visualização)
@@ -523,7 +391,9 @@ function verComprovante(id) {
           if (vendas.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
           }
-        }  finally {
+        } catch (error) {
+          showNotification('Erro ao carregar vendas: ' + error.message, 'danger');
+        } finally {
           document.getElementById('loader').style.display = 'none';
         }
       }
@@ -546,241 +416,28 @@ function verComprovante(id) {
         });
       });
     
-      
-
-      let pedidoIdParaPagamento = null;
-
-          function editarPagamento(id) {
-            pedidoIdParaPagamento = id;
-            document.getElementById("modalPagamento").classList.add("is-active");
-          }
-
-          function fecharModalPagamento() {
-            document.getElementById("modalPagamento").classList.remove("is-active");
-            pedidoIdParaPagamento = null;
-          }
-
-
-      async function editarItens(id) {
-        const raw = prompt("Informe os itens no formato: produto_id,quantidade;produto_id,quantidade");
-        if (!raw) return;
-        try {
-          const itens = raw.split(";").map(i => {
-            const [produto_id, quantidade] = i.split(",");
-            return { produto_id: parseInt(produto_id), quantidade: parseInt(quantidade) };
-          });
-          const response = await fetch('/editar_itens', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pedido_id: id, itens })
-          });
-          if (!response.ok) throw new Error("Erro ao atualizar itens.");
-          showNotification("Itens do pedido atualizados com sucesso!", "success");
-        } 
-      catch (err) {
-    showNotification("Erro: " + err.message, "danger");
-  }
-}
-
-
-let produtosDisponiveis = [];
-let pedidoIdParaItens = null;
-
-async function carregarProdutos() {
-  const res = await fetch('/api/produtos');
-  produtosDisponiveis = await res.json();
-}
-
-function editarItens(id) {
-  pedidoIdParaItens = id;
-  document.getElementById("itensContainer").innerHTML = "";
-  adicionarLinhaItem();
-  document.getElementById("modalItens").classList.add("is-active");
-}
-
-function fecharModalItens() {
-  document.getElementById("modalItens").classList.remove("is-active");
-  pedidoIdParaItens = null;
-}
-
-function adicionarLinhaItem() {
-  const container = document.getElementById("itensContainer");
-  const div = document.createElement("div");
-  div.className = "field is-grouped mt-2";
-  div.innerHTML = `
-    <div class="control is-expanded">
-      <div class="select is-fullwidth">
-        <select class="select-produto">
-          ${produtosDisponiveis.map(p => `<option value="${p.id}">${p.nome}</option>`).join("")}
-        </select>
-      </div>
-    </div>
-    <div class="control">
-      <input type="number" min="1" value="1" class="input quantidade" style="width: 80px;">
-    </div>
-    <div class="control">
-      <button class="button is-danger is-light" onclick="this.closest('.field').remove()">✖</button>
-    </div>
-  `;
-  container.appendChild(div);
-}
-
-async function salvarItens() {
-  const linhas = [...document.querySelectorAll("#itensContainer .field")];
-  const itens = linhas.map(linha => {
-    const produto_id = parseInt(linha.querySelector(".select-produto").value);
-    const quantidade = parseInt(linha.querySelector(".quantidade").value);
-    return { produto_id, quantidade };
-  });
-
-  if (itens.length === 0) {
-    showNotification("Adicione ao menos um item", "warning");
-    return;
-  }
-
-  try {
-    const response = await fetch("/editar_itens", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pedido_id: pedidoIdParaItens, itens })
-    });
-    if (!response.ok) throw new Error("Erro ao salvar itens");
-    showNotification("Itens atualizados com sucesso!", "success");
-    fecharModalItens();
-  } catch (err) {
-    showNotification("Erro: " + err.message, "danger");
-  }
-}
-
-
-document.addEventListener("DOMContentLoaded", carregarProdutos);
-
-</script>
-  
-<!-- Modal: Editar Pagamento -->
-<div class="modal" id="modalPagamento">
-  <div class="modal-background" onclick="fecharModalPagamento()"></div>
-  <div class="modal-card">
-    <header class="modal-card-head">
-      <p class="modal-card-title">Editar Forma de Pagamento</p>
-      <button class="delete" aria-label="close" onclick="fecharModalPagamento()"></button>
-    </header>
-    <section class="modal-card-body">
-      <div class="field">
-        <label class="label">Forma de Pagamento</label>
-        <div class="control">
-          <div class="select is-fullwidth">
-            <select id="formaPagamentoInput">
-              <option value="">Selecione</option>
-              <option value="pix">PIX</option>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix e dinheiro">Pix e Dinheiro</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </section>
-    <footer class="modal-card-foot">
-      <button class="button is-success" onclick="salvarPagamento()">Salvar</button>
-      <button class="button" onclick="fecharModalPagamento()">Cancelar</button>
-    </footer>
-  </div>
-</div>
-
-
-<!-- Modal: Editar Itens -->
-<div class="modal" id="modalItens">
-  <div class="modal-background" onclick="fecharModalItens()"></div>
-  <div class="modal-card" style="width: 600px;">
-    <header class="modal-card-head">
-      <p class="modal-card-title">Editar Itens do Pedido</p>
-      <button class="delete" aria-label="close" onclick="fecharModalItens()"></button>
-    </header>
-    <section class="modal-card-body">
-      <div id="itensContainer"></div>
-      <button class="button is-small is-info mt-2" onclick="adicionarLinhaItem()">+ Adicionar Item</button>
-    </section>
-    <footer class="modal-card-foot">
-      <button class="button is-success" onclick="salvarItens()">Salvar</button>
-      <button class="button" onclick="fecharModalItens()">Cancelar</button>
-    </footer>
-  </div>
-</div>
-
-<!-- Modal de Informações do Pedido -->
-<div class="modal" id="modalInfoPedido">
-  <div class="modal-background" onclick="fecharModalInfo()"></div>
-  <div class="modal-card" style="width: 600px;">
-    <header class="modal-card-head">
-      <p class="modal-card-title">Detalhes do Pedido</p>
-      <button class="delete" aria-label="close" onclick="fecharModalInfo()"></button>
-    </header>
-    <section class="modal-card-body">
-      <div id="detalhesPedidoContent">
-        <p><strong>ID do Pedido:</strong> <span id="infoId"></span></p>
-        <p><strong>Cliente:</strong> <span id="infoCliente"></span></p>
-        <p><strong>Endereço:</strong> <span id="infoEndereco"></span></p>
-        <p><strong>Produtos:</strong> <span id="infoProdutos"></span></p>
-        <p><strong>Valor Total:</strong> R$ <span id="infoValor"></span></p>
-        <p><strong>Forma de Pagamento:</strong> <span id="infoPagamento"></span></p>
-        <p><strong>Status:</strong> <span id="infoStatus"></span></p>
-        <p><strong>Data:</strong> <span id="infoData"></span></p>
-      </div>
-    </section>
-    <footer class="modal-card-foot">
-      <button class="button" onclick="fecharModalInfo()">Fechar</button>
-    </footer>
-  </div>
-</div>
-
-<script>
-function informacoesDoPedido(id) {
-  fetch('/api/pedidos/' + id)
-    .then(res => res.json())
-    .then(p => {
-      if (!p || p.erro) {
-        showNotification("Pedido não encontrado.", "warning");
-        return;
+      function verComprovante(id) {
+        fetch(`/comprovante/${id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.image) {
+              const win = window.open();
+              win.document.write('<img src="' + data.image + '" style="max-width:100%">');
+            } else {
+              showNotification('Comprovante não encontrado.', 'warning');
+            }
+          })
+          .catch(() => showNotification('Erro ao buscar comprovante.', 'danger'));
       }
 
-      document.getElementById('infoId').textContent =
-        p.pedido_id ?? p.id ?? id;
+      function editarPagamento(id) {
+        showNotification("Editar forma de pagamento do pedido #" + id + " (em breve)", "info");
+      }
 
-      document.getElementById('infoCliente').textContent =
-        p.cliente_numero?.replace('@c.us', '') || "-";
+      function editarItens(id) {
+        showNotification("Editar itens do pedido #" + id + " (em breve)", "info");
+      }
 
-      document.getElementById('infoEndereco').textContent =
-        p.endereco || "-";
-
-      document.getElementById('infoProdutos').textContent =
-        p.itens || p.produtos || "-";
-
-      document.getElementById('infoValor').textContent =
-        p.valor_total && p.valor_total !== "-" ? `R$ ${parseFloat(p.valor_total).toFixed(2)}` : "-";
-
-      document.getElementById('infoPagamento').textContent =
-        p.forma_pagamento || "-";
-
-      document.getElementById('infoStatus').textContent =
-        p.status || "-";
-
-      const dataFormatada = p.data_pedido || p.data;
-      document.getElementById('infoData').textContent =
-        dataFormatada ? new Date(dataFormatada).toLocaleString("pt-BR") : "-";
-
-      document.getElementById('modalInfoPedido').classList.add('is-active');
-    })
-    .catch(err => {
-      showNotification("Erro ao carregar pedido: " + err.message, "danger");
-    });
-}
-
-
-function fecharModalInfo() {
-  document.getElementById('modalInfoPedido').classList.remove('is-active');
-}
 </script>
-
-
-</body>
+  </body>
 </html>
