@@ -284,6 +284,60 @@ app.post('/api/estoque', async (req, res) => {
   }
 });
 
+// Rota para listar lançamentos
+app.get('/api/lancamentos', async (req, res) => {
+  try {
+    const [dados] = await db.query('SELECT * FROM lancamentos ORDER BY data DESC');
+    res.json(dados);
+  } catch (error) {
+    console.error('Erro ao buscar lançamentos:', error);
+    res.status(500).json({ erro: 'Erro ao buscar lançamentos' });
+  }
+});
+
+// Rota para adicionar lançamento
+app.post('/api/lancamentos', async (req, res) => {
+  const { descricao, valor, categoria, data_lancamento, tipo } = req.body;
+  if (!descricao || !valor || !data_lancamento) {
+    return res.status(400).json({ erro: 'Campos obrigatórios não preenchidos.' });
+  }
+  try {
+    await db.query('INSERT INTO lancamentos (descricao, valor, categoria, data_lancamento, tipo) VALUES (?, ?, ?, ?, ?)', 
+    [descricao, valor, categoria, data_lancamento, tipo]);
+    res.json({ mensagem: 'Lançamento cadastrado com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao adicionar lançamento:', error);
+    res.status(500).json({ erro: 'Erro ao adicionar lançamento' });
+  }
+});
+
+// Rota para editar lançamento
+app.put('/api/lancamentos/:id', async (req, res) => {
+  const { id } = req.params;
+  const { descricao, valor, categoria, data_lancamento, tipo } = req.body;
+  try {
+    await db.query('UPDATE lancamentos SET descricao = ?, valor = ?, categoria = ?, data_lancamento = ?, tipo = ? WHERE id = ?', 
+    [descricao, valor, categoria, data_lancamento, tipo, id]);
+    res.json({ mensagem: 'Lançamento atualizado com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao atualizar lançamento:', error);
+    res.status(500).json({ erro: 'Erro ao atualizar lançamento' });
+  }
+});
+
+// Rota para deletar lançamento
+app.delete('/api/lancamentos/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query('DELETE FROM lancamentos WHERE id = ?', [id]);
+    res.json({ mensagem: 'Lançamento deletado com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao deletar lançamento:', error);
+    res.status(500).json({ erro: 'Erro ao deletar lançamento' });
+  }
+});
+
+
 app.get('/api/dashboard', async (req, res) => {
   try {
     const [[vendasInfo]] = await db.query(`
@@ -412,51 +466,58 @@ app.get('/entregas', async (req, res) => {
 
 app.get('/api/categorias', async (req, res) => {
   try {
-    const [result] = await db.query("SHOW COLUMNS FROM estoque WHERE Field = 'categoria'");
-    if (result.length === 0) {
+    const [result] = await db.query("SHOW COLUMNS FROM estoque LIKE 'categoria'");
+    if (!result.length) {
       return res.status(404).json({ error: 'Coluna categoria não encontrada' });
     }
-    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+    const enumValues = result[0].Type.match(/enum\((.*)\)/)[1]
       .split(',')
       .map(value => value.replace(/'/g, ''));
-    const categorias = enumValues.map(value => ({
-      id: value,
-      nome: value.charAt(0).toUpperCase() + value.slice(1)
+
+    const categorias = enumValues.map((cat) => ({
+      id: cat,
+      nome: cat.charAt(0).toUpperCase() + cat.slice(1)
     }));
+
     res.json(categorias);
   } catch (error) {
-    console.error('Erro ao buscar valores do ENUM categoria:', error);
+    console.error('Erro ao buscar categorias:', error);
     res.status(500).json({ error: 'Erro ao buscar categorias' });
   }
 });
 
+
 app.post('/api/categorias', async (req, res) => {
+  const { novaCategoria } = req.body;
+  if (!novaCategoria) {
+    return res.status(400).json({ error: 'Nome da categoria é obrigatório' });
+  }
+
   try {
-    const { novaCategoria } = req.body;
-    if (!novaCategoria || typeof novaCategoria !== 'string' || novaCategoria.trim() === '') {
-      return res.status(400).json({ error: 'O nome da nova categoria é obrigatório e deve ser uma string válida' });
-    }
-    const categoriaNormalizada = novaCategoria.trim().toLowerCase();
-    const [result] = await db.query("SHOW COLUMNS FROM estoque WHERE Field = 'categoria'");
-    if (result.length === 0) {
+    const [result] = await db.query("SHOW COLUMNS FROM estoque LIKE 'categoria'");
+    if (!result.length) {
       return res.status(404).json({ error: 'Coluna categoria não encontrada' });
     }
-    const enumValues = result[0].Type.match(/enum\((.+)\)/)[1]
+
+    const enumValues = result[0].Type.match(/enum\((.*)\)/)[1]
       .split(',')
       .map(value => value.replace(/'/g, ''));
-    if (enumValues.includes(categoriaNormalizada)) {
+
+    if (enumValues.includes(novaCategoria)) {
       return res.status(400).json({ error: 'Categoria já existe' });
     }
-    const novosValores = [...enumValues, categoriaNormalizada]
-      .map(value => `'${value}'`)
-      .join(',');
-    await db.query(`ALTER TABLE estoque MODIFY COLUMN categoria ENUM(${novosValores}) NOT NULL`);
-    res.status(201).json({ mensagem: 'Categoria adicionada com sucesso', categoria: categoriaNormalizada });
+
+    const novosEnums = [...enumValues, novaCategoria].map(v => `'${v}'`).join(',');
+
+    await db.query(`ALTER TABLE estoque MODIFY COLUMN categoria ENUM(${novosEnums}) NOT NULL`);
+
+    res.json({ mensagem: 'Categoria adicionada com sucesso' });
   } catch (error) {
     console.error('Erro ao adicionar categoria:', error);
     res.status(500).json({ error: 'Erro ao adicionar categoria' });
   }
 });
+
 
 app.get('/api/resumo', async (req, res) => {
   try {
