@@ -78,14 +78,14 @@
       <ul class="menu-list">
         <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
         <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
-        <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-        <li><a href="despesas.html" class="has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
+        <li><a href="estoque.html" class="is-active  has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
       </ul>
       <p class="menu-label">Logic Ice</p>
       <ul class="menu-list">
         <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
         <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
-        <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
+        <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
       </ul>
     </div>
   </aside>
@@ -105,9 +105,9 @@
           <div class="level-item"><h1 class="title">Estoque</h1></div>
         </div>
         <div class="level-right">
-          <div class="level-item">
+          <div class="level-item"><button id="addEstoqueBtn" class="button is-link mr-2">Adicionar Estoque</button>
+          <button id="baixarEstoqueBtn" class="button is-danger mr-2">Baixar Estoque</button>
             <button id="addItemBtn" class="button is-success mr-2">Adicionar Item</button>
-            <button id="exportCsvBtn" class="button is-info mr-2">Exportar CSV</button>
             <button id="refreshEstoqueBtn" class="button is-primary">Atualizar</button>
           </div>
         </div>
@@ -189,6 +189,7 @@
             </thead>
             <tbody id="estoqueTable"></tbody>
           </table>
+          <div id="pagination" class="mt-4"></div>
         </div>
       </div>
     </div>
@@ -303,8 +304,85 @@
         </footer>
       </div>
     </div>
+    <div class="modal" id="modalAddEstoque">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Adicionar Estoque</p>
+      <button class="delete" aria-label="close" onclick="fecharModalAddEstoque()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Item</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="selectAddEstoque"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Quantidade</label>
+        <div class="control">
+          <input class="input" type="number" id="quantidadeAddEstoque" min="1">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" onclick="confirmarAddEstoque()">Adicionar</button>
+      <button class="button" onclick="fecharModalAddEstoque()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+<div class="modal" id="modalBaixaEstoque">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Baixar Estoque</p>
+      <button class="delete" aria-label="close" onclick="fecharModalBaixaEstoque()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Item</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="selectBaixaEstoque"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Quantidade</label>
+        <div class="control">
+          <input class="input" type="number" id="quantidadeBaixaEstoque" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Descrição da Baixa</label>
+        <div class="control">
+          <input class="input" type="text" id="descricaoBaixaEstoque">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-danger" onclick="confirmarBaixaEstoque()">Baixar</button>
+      <button class="button" onclick="fecharModalBaixaEstoque()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+
   </section>
   <style>
+    .pagination-list {
+    flex-wrap: wrap; /* Permite que os links quebrem linha em telas menores */
+    gap: 0.5rem; /* Espaçamento entre links */
+  }
+  @media (max-width: 768px) {
+    .pagination-list {
+      justify-content: center; /* Centraliza em telas pequenas */
+    }
+    .level-left p {
+      font-size: 0.9rem; /* Ajusta tamanho do texto */
+    }
+  }
     .table-container {
       max-height: 400px;
       overflow-y: auto;
@@ -355,74 +433,263 @@ document.querySelector('.navbar-item[title="Log out"]').addEventListener('click'
   localStorage.removeItem('permissao');
   window.location.href = '../login.html';
 });
+// Variáveis globais para paginação
+let currentPage = 1;
+const itemsPerPage = 10;
 
-// Função para formatar datas
+// Função para formatar datas (mantida do original)
 function formatarData(data) {
   try {
     const d = new Date(data);
     if (isNaN(d.getTime())) throw new Error('Data inválida');
-    return d.toLocaleString('pt-BR');
+    return d.toLocaleDateString('pt-BR');
   } catch (error) {
     console.error('Erro ao formatar data:', error);
     return 'Data inválida';
   }
 }
 
-// Função para buscar e atualizar o estoque
-async function atualizarEstoque(filtros = {}) {
-  const tbody = document.getElementById('estoqueTable');
-  if (!tbody) {
-    console.error('Elemento com ID "estoqueTable" não encontrado no DOM');
-    mostrarNotificacao('Erro: Tabela de estoque não encontrada', 'is-danger');
+document.getElementById('addEstoqueBtn').addEventListener('click', abrirModalAddEstoque);
+document.getElementById('baixarEstoqueBtn').addEventListener('click', abrirModalBaixaEstoque);
+
+async function abrirModalAddEstoque() {
+  const select = document.getElementById('selectAddEstoque');
+  const items = await carregarItensEstoque();
+  preencherSelectItens(select, items);
+  document.getElementById('modalAddEstoque').classList.add('is-active');
+}
+
+function fecharModalAddEstoque() {
+  document.getElementById('modalAddEstoque').classList.remove('is-active');
+}
+
+async function abrirModalBaixaEstoque() {
+  const select = document.getElementById('selectBaixaEstoque');
+  const items = await carregarItensEstoque();
+  preencherSelectItens(select, items);
+  document.getElementById('modalBaixaEstoque').classList.add('is-active');
+}
+
+function fecharModalBaixaEstoque() {
+  document.getElementById('modalBaixaEstoque').classList.remove('is-active');
+}
+
+async function carregarItensEstoque() {
+  const response = await fetch('/api/estoque');
+  const data = await response.json();
+  return data.itens || [];
+
+}
+
+function preencherSelectItens(select, items) {
+  select.innerHTML = '';
+  items.forEach(item => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = `${item.nome} (Qtd: ${item.quantidade})`;
+    select.appendChild(option);
+  });
+}
+async function confirmarAddEstoque() {
+  const id = document.getElementById('selectAddEstoque').value;
+  const quantidade = parseInt(document.getElementById('quantidadeAddEstoque').value);
+
+  if (!id || quantidade <= 0) {
+     mostrarNotificacao('Selecione um item e informe uma quantidade válida.', 'is-danger');
     return;
   }
+
+  await fetch('/api/estoque/entrada', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, quantidade })
+  });
+mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
+  fecharModalAddEstoque();
+  atualizarEstoque();
+}
+
+async function confirmarBaixaEstoque() {
+  const id = document.getElementById('selectBaixaEstoque').value;
+  const quantidade = parseInt(document.getElementById('quantidadeBaixaEstoque').value);
+  const descricao = document.getElementById('descricaoBaixaEstoque').value;
+
+  if (!id || quantidade <= 0 || !descricao) {
+     mostrarNotificacao('Preencha todos os campos corretamente.', 'is-danger');
+    return;
+  }
+
+  const res = await fetch('/api/estoque/saida', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, quantidade, descricao })
+  });
+
+  const result = await res.json();
+  if (!res.ok) {
+     mostrarNotificacao(result.erro || 'Erro na baixa');
+    return;
+  }
+mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
+  fecharModalBaixaEstoque();
+  atualizarEstoque();
+}
+
+// Função de notificação com Bulma (melhorada)
+function mostrarNotificacao(mensagem, tipo) {
+  const notificacao = document.createElement('div');
+  notificacao.className = `notification ${tipo} is-light`;
+  notificacao.style.position = 'fixed';
+  notificacao.style.top = '10px';
+  notificacao.style.right = '10px';
+  notificacao.style.zIndex = '1000';
+  notificacao.style.maxWidth = '300px';
+  notificacao.textContent = mensagem;
+  document.body.appendChild(notificacao);
+  setTimeout(() => notificacao.remove(), 3000);
+}
+
+// Função para buscar e atualizar lançamentos
+async function atualizarEstoque(filtros = {}) {
+  const tbody = document.getElementById('estoqueTable');
+  const pagination = document.getElementById('pagination');
+  if (!tbody || !pagination) return;
+
+  filtros.page = currentPage;
+  filtros.limit = itemsPerPage;
+
+  const query = new URLSearchParams(filtros).toString();
   tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Carregando...</td></tr>';
+
   try {
-    const query = new URLSearchParams(filtros).toString();
-    const response = await fetch(`/api/estoque?${query}`, {
-      headers: { 'Accept': 'application/json' }
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Erro na resposta do servidor: ${response.status} ${response.statusText}\nResposta: ${text.substring(0, 100)}`);
-    }
-    const itens = await response.json();
+    const response = await fetch(`/api/estoque?${query}`);
+    if (!response.ok) throw new Error('Erro ao carregar estoque');
+
+    const { itens: estoque, total, page, totalPages } = await response.json();
     tbody.innerHTML = '';
-    if (!Array.isArray(itens)) {
-      throw new Error('Resposta da API não é um array: ' + JSON.stringify(itens));
-    }
-    if (itens.length === 0) {
+
+    if (!Array.isArray(estoque) || estoque.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhum item encontrado</td></tr>';
+      pagination.innerHTML = '';
       return;
     }
-    itens.forEach(item => {
-      if (!item.id || !item.nome || item.quantidade === undefined || item.valor_unitario === undefined || !item.categoria) {
-        console.warn('Item inválido: ' + JSON.stringify(item));
-        return;
-      }
-      const isLowStock = item.quantidade < 10;
+
+    estoque.forEach(item => {
       const row = document.createElement('tr');
-      row.className = isLowStock ? 'has-background-danger-light' : '';
       row.innerHTML = `
         <td>${item.id}</td>
         <td>${item.nome}</td>
         <td>${item.quantidade}</td>
         <td>R$ ${parseFloat(item.valor_unitario).toFixed(2)}</td>
-        <td>${item.categoria}</td>
-        <td>${formatarData(item.ultima_atualizacao)}</td>
+        <td>${item.categoria || '-'}</td>
+        <td>${new Date(item.ultima_atualizacao).toLocaleDateString('pt-BR')}</td>
         <td>
           <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(item)})'>Editar</button>
-        </td>`;
+        </td>
+      `;
       tbody.appendChild(row);
     });
 
-  } catch (error) {
-    console.error('Erro ao atualizar estoque:', error);
-    tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Erro ao carregar itens: ' + error.message + '</td></tr>';
-    mostrarNotificacao('Erro ao carregar estoque: ' + error.message, 'is-danger');
+    renderPagination(page, totalPages, total);
+  } catch (err) {
+    console.error(err);
+    tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Erro ao carregar estoque</td></tr>';
+    pagination.innerHTML = '';
   }
 }
 
+
+// Função para renderizar paginação com links limitados
+function renderPagination(currentPage, totalPages, total) {
+  const pagination = document.getElementById('pagination');
+  if (!pagination) return;
+
+  const maxPagesToShow = 5; // Máximo de links de página visíveis
+  const pages = [];
+  const startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+  const endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+  // Ajustar startPage se endPage estiver no limite
+  const adjustedStartPage = Math.max(1, endPage - maxPagesToShow + 1);
+
+  // Adicionar primeira página e reticências, se necessário
+  if (adjustedStartPage > 1) {
+    pages.push(1);
+    if (adjustedStartPage > 2) pages.push('...');
+  }
+
+  // Adicionar páginas no intervalo
+  for (let page = adjustedStartPage; page <= endPage; page++) {
+    pages.push(page);
+  }
+
+  // Adicionar última página e reticências, se necessário
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) pages.push('...');
+    pages.push(totalPages);
+  }
+
+  // Renderizar HTML da paginação
+  pagination.innerHTML = `
+    <div class="level">
+      <div class="level-left">
+        <p class="level-item">Mostrando ${(currentPage - 1) * itemsPerPage + 1} a ${Math.min(currentPage * itemsPerPage, total)} de ${total} lançamentos</p>
+      </div>
+      <div class="level-right">
+        <nav class="pagination is-right" role="navigation" aria-label="pagination">
+          <button class="pagination-previous button" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">Anterior</button>
+          <button class="pagination-next button" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Próximo</button>
+          <ul class="pagination-list">
+            ${pages.map(page => page === '...' ? `
+              <li><span class="pagination-ellipsis">&hellip;</span></li>
+            ` : `
+              <li>
+                <a class="pagination-link button ${page === currentPage ? 'is-current' : ''}" onclick="changePage(${page})">${page}</a>
+              </li>
+            `).join('')}
+          </ul>
+        </nav>
+      </div>
+    </div>`;
+}
+
+function changePage(page) {
+  if (page < 1) return;
+  currentPage = page;
+  const filtros = {
+    nome: document.getElementById('nomeItem')?.value || '',
+    categoria: document.getElementById('categoria')?.value || '',
+    estoque_baixo: document.getElementById('estoqueBaixo')?.value || ''
+  };
+  atualizarEstoque(filtros);
+}
+
+
+// Função para filtrar lançamentos
+function filtrarLancamentos() {
+  currentPage = 1; // Resetar para a primeira página ao filtrar
+  const filtros = {
+    descricao: document.getElementById('filtroDescricao')?.value || '',
+    categoria: document.getElementById('filtroCategoria')?.value || '',
+    tipo: document.getElementById('filtroTipo')?.value || ''
+  };
+  atualizarEstoque(filtros);
+}
+
+// Inicialização (exemplo, inclua outros event listeners conforme necessário)
+document.addEventListener('DOMContentLoaded', () => {
+  atualizarEstoque();
+  const filterForm = document.getElementById('filterLancamentosForm');
+  if (filterForm) {
+    filterForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      filtrarLancamentos();
+    });
+  }
+  document.getElementById('addLancamentoBtn')?.addEventListener('click', openRegisterModal);
+  document.getElementById('exportCsvBtn')?.addEventListener('click', exportarCsv);
+  document.getElementById('refreshBtn')?.addEventListener('click', () => atualizarEstoque());
+});
 // Função para carregar categorias do backend
 async function carregarCategorias() {
 
@@ -667,29 +934,7 @@ async function deletarItem() {
   }
 }
 
-// Função para exportar tabela como CSV
-function exportarCsv() {
-  const table = document.getElementById('estoqueTable');
-  if (!table) {
-    console.error('Tabela estoqueTable não encontrada');
-    return;
-  }
-  let csv = [];
-  const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent).slice(0, -1);
-  csv.push(headers.join(','));
-  const rows = table.querySelectorAll('tbody tr');
-  rows.forEach(row => {
-    const cells = Array.from(row.querySelectorAll('td')).slice(0, -1).map(cell => `"${cell.textContent.replace(/"/g, '""')}"`);
-    csv.push(cells.join(','));
-  });
-  const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv.join('\n'));
-  const link = document.createElement('a');
-  link.setAttribute('href', csvContent);
-  link.setAttribute('download', `estoque_${new Date().toISOString().split('T')[0]}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -713,6 +958,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Filtro de estoque
     const filterForm = document.getElementById('filterEstoqueForm');
+    currentPage = 1;
     if (filterForm) {
       filterForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -745,13 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Botão addItemBtn não encontrado');
     }
 
-    // Botão de exportar CSV
-    const exportCsvBtn = document.getElementById('exportCsvBtn');
-    if (exportCsvBtn) {
-      exportCsvBtn.addEventListener('click', exportarCsv);
-    } else {
-      console.error('Botão exportCsvBtn não encontrado');
-    }
+   
 
     // Formulário de adicionar categoria
     const addCategoriaForm = document.getElementById('addCategoriaForm');

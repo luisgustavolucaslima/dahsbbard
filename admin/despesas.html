@@ -93,7 +93,6 @@
         <div class="level-right">
           <div class="level-item">
             <button id="addDespesaBtn" class="button is-success mr-2">Adicionar Despesa</button>
-            <button id="exportCsvBtn" class="button is-info mr-2">Exportar CSV</button>
             <button id="refreshDespesasBtn" class="button is-primary">Atualizar</button>
           </div>
         </div>
@@ -708,30 +707,6 @@ async function deletarDespesa() {
   }
 }
 
-// Função para exportar tabela como CSV
-function exportarCsv() {
-  const table = document.getElementById('despesasTable');
-  if (!table) {
-    console.error('Tabela despesasTable não encontrada');
-    showToast('Erro: Tabela de despesas não encontrada', 'error');
-    return;
-  }
-  let csv = [];
-  const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent).slice(0, -1);
-  csv.push(headers.join(','));
-  const rows = table.querySelectorAll('tbody tr');
-  rows.forEach(row => {
-    const cells = Array.from(row.querySelectorAll('td')).slice(0, -1).map(cell => `"${cell.textContent.replace(/"/g, '""')}"`);
-    csv.push(cells.join(','));
-  });
-  const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv.join('\n'));
-  const link = document.createElement('a');
-  link.setAttribute('href', csvContent);
-  link.setAttribute('download', `despesas_${new Date().toISOString().split('T')[0]}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -779,14 +754,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Erro: Botão de adição não encontrado', 'error');
     }
 
-    // Botão de exportar CSV
-    const exportCsvBtn = document.getElementById('exportCsvBtn');
-    if (exportCsvBtn) {
-      exportCsvBtn.addEventListener('click', exportarCsv);
-    } else {
-      console.error('Botão exportCsvBtn não encontrado');
-      showToast('Erro: Botão de exportação não encontrado', 'error');
-    }
 
     // Formulário de adicionar categoria
     const addCategoriaForm = document.getElementById('addCategoriaForm');

@@ -40,14 +40,16 @@
           <span><b>Gerente de Vendas</b></span>
         </div>
       </div>
-      <div class="menu is-menu-main">
-        <p class="menu-label">Geral</p>
-        <ul class="menu-list">
-          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-          <li><a href="entregas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
-          <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-        </ul>
-      </div>
+     <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="lancamentos.html" class="has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+        <li><a href="entregas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+    </div>
     </aside>
     <section class="section is-title-bar">
       <div class="level">
@@ -91,7 +93,6 @@
                   <p><span class="icon-text"><span class="icon"><i class="mdi mdi-pound"></i></span><strong>ID do Pedido:</strong></span> <span id="modalPedidoId">N/A</span></p>
                   <p><span class="icon-text"><span class="icon"><i class="mdi mdi-account"></i></span><strong>Cliente:</strong></span> <span id="modalClienteNumero">N/A</span></p>
                   <p><span class="icon-text"><span class="icon"><i class="mdi mdi-package-variant"></i></span><strong>Itens:</strong></span> <span id="modalItens">N/A</span></p>
-                  <p><span class="icon-text"><span class="icon"><i class="mdi mdi-map-marker"></i></span><strong>Endereço:</strong></span> <span id="modalEndereco">N/A</span></p>
                   <p><span class="icon-text"><span class="icon"><i class="mdi mdi-information"></i></span><strong>Status:</strong></span> <span id="modalStatus">N/A</span></p>
                 </div>
                 <div class="column is-6">
@@ -471,7 +472,6 @@
         document.getElementById('modalPedidoId').textContent = entrega.pedido_id || 'N/A';
         document.getElementById('modalClienteNumero').textContent = formatarCliente(entrega.cliente_numero);
         document.getElementById('modalItens').textContent = entrega.itens || 'N/A';
-        document.getElementById('modalEndereco').textContent = entrega.endereco || 'N/A';
         document.getElementById('modalStatus').textContent = entrega.status || 'N/A';
         document.getElementById('modalRota').textContent = entrega.rota || 'N/A';
         document.getElementById('modalEntregador').textContent = formatarCliente(entrega.entregador_id);
@@ -509,7 +509,6 @@
             <td>${entrega.pedido_id}</td>
             <td>${formatarCliente(entrega.cliente_numero)}</td>
             <td>${entrega.itens || 'N/A'}</td>
-            <td>${entrega.endereco || 'N/A'}</td>
             <td>${entrega.status || 'N/A'}</td>
             <td>${entrega.rota || 'N/A'}</td>
             <td>${formatarCliente(entrega.entregador_id)}</td>

@@ -6,6 +6,8 @@ const mysql = require('mysql2/promise');
 const app = express();
 const port = 3000;
 const usuariosPermitidos = ['usuario1', 'usuario2'];
+const cors = require('cors');
+app.use(cors());
 
 const db = mysql.createPool({
   host: '127.0.0.1',
@@ -27,8 +29,8 @@ app.get('/pedidos_diarios', async (req, res) => {
           pd.status, 
           pd.valido, 
           pd.data_hora, 
+          pd.numero_diario, 
           pd.data, 
-          pd.endereco, 
           pd.recebido, 
           pd.venda_id,
           GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as produtos,
@@ -103,7 +105,7 @@ app.post('/enviar_para_entrega', async (req, res) => {
     const { rota } = req.body;
     const [pedidos] = await db.query(`
       SELECT 
-        pd.id, pd.cliente_numero, pd.data, pd.endereco, pd.recebido,
+        pd.id, pd.cliente_numero, pd.data, pd.recebido,
         GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as itens
       FROM pedidos_diarios pd
       LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
@@ -115,13 +117,12 @@ app.post('/enviar_para_entrega', async (req, res) => {
     for (const pedido of pedidos) {
       await db.query(`
         INSERT INTO entregas
-          (pedido_id, cliente_numero, itens, endereco, recebido, rota, data_pedido)
+          (pedido_id, cliente_numero, itens, recebido, rota, data_pedido)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [
         pedido.id,
         pedido.cliente_numero,
         pedido.itens || '',
-        pedido.endereco,
         pedido.recebido,
         rota,
         pedido.data
@@ -151,18 +152,44 @@ app.post('/mover', async (req, res) => {
 
 app.post('/valido', async (req, res) => {
   const { id, valido } = req.body;
+
   try {
     if (valido == 0) {
       await db.query("UPDATE pedidos_diarios SET valido = ?, status = 'finalizado' WHERE id = ?", [valido, id]);
-    } else {
-      await db.query("UPDATE pedidos_diarios SET valido = ? WHERE id = ?", [valido, id]);
+      return res.sendStatus(200);
     }
+
+    // Baixa de estoque somente se validar (valido == 1)
+    const [itens] = await db.query(`
+      SELECT pi.produto_id, pi.quantidade, e.quantidade AS em_estoque
+      FROM pedido_itens pi
+      JOIN estoque e ON pi.produto_id = e.id
+      WHERE pi.pedido_id = ?
+    `, [id]);
+
+    // Verifica se todos os itens têm estoque suficiente
+    for (const item of itens) {
+      if (item.quantidade > item.em_estoque) {
+        return res.status(400).json({ erro: `Estoque insuficiente para o produto ${item.produto_id}` });
+      }
+    }
+
+    // Faz a baixa
+    for (const item of itens) {
+      await db.query(`
+        UPDATE estoque SET quantidade = quantidade - ? WHERE id = ?
+      `, [item.quantidade, item.produto_id]);
+    }
+
+    await db.query("UPDATE pedidos_diarios SET valido = ? WHERE id = ?", [valido, id]);
+
     res.sendStatus(200);
   } catch (err) {
     console.error("Erro ao atualizar validade do pedido:", err);
     res.status(500).send("Erro interno ao atualizar validade.");
   }
 });
+
 
 app.post('/login', async (req, res) => {
   const { usuario, senha } = req.body;
@@ -232,19 +259,24 @@ app.get('/api/vendas-por-cliente', async (req, res) => {
 
 app.get('/api/estoque', async (req, res) => {
   try {
-    const { nome, categoria, estoque_baixo } = req.query;
+    const { page = 1, limit = 10, nome, categoria, estoque_baixo } = req.query;
+    const offset = (page - 1) * limit;
     const params = [];
+    const countParams = [];
     let whereClauses = [];
     if (nome) {
       whereClauses.push('nome LIKE ?');
       params.push(`%${nome}%`);
+      countParams.push(`%${nome}%`);
     }
     if (categoria) {
       whereClauses.push('categoria = ?');
       params.push(categoria);
+      countParams.push(categoria);
     }
     if (estoque_baixo === 'baixo') {
       whereClauses.push('quantidade < 10');
+      countParams.push('quantidade < 10');
     }
     const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
     const query = `
@@ -258,9 +290,19 @@ app.get('/api/estoque', async (req, res) => {
       FROM estoque
       ${where}
       ORDER BY ultima_atualizacao DESC
+      LIMIT ? OFFSET ?
     `;
+    const countQuery = `SELECT COUNT(*) as total FROM estoque ${where}`;
+    params.push(parseInt(limit), parseInt(offset));
     const [itens] = await db.query(query, params);
-    res.json(itens);
+    const [[{ total }]] = await db.query(countQuery, countParams);
+    res.json({
+      itens,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error('Erro ao buscar estoque:', err);
     res.status(500).json({ erro: 'Erro ao buscar estoque' });
@@ -283,41 +325,176 @@ app.post('/api/estoque', async (req, res) => {
     res.status(500).json({ erro: 'Erro ao adicionar item' });
   }
 });
+app.post('/api/estoque/entrada', async (req, res) => {
+  const { id, quantidade, descricao } = req.body;
+  if (!id || !quantidade) return res.status(400).json({ erro: 'Dados inválidos' });
 
-// Rota para listar lançamentos
+  try {
+    await db.query('UPDATE estoque SET quantidade = quantidade + ? WHERE id = ?', [quantidade, id]);
+    await db.query('INSERT INTO lancamentos (descricao, categoria, tipo, data_lancamento) VALUES (?, "estoque", "entrada", NOW())', [descricao || `Entrada de estoque ID ${id}`]);
+
+    res.json({ mensagem: 'Estoque atualizado com sucesso' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao atualizar estoque' });
+  }
+});
+app.post('/api/estoque/saida', async (req, res) => {
+  const { id, quantidade, descricao } = req.body;
+  if (!id || !quantidade || quantidade <= 0) {
+    return res.status(400).json({ erro: 'Dados inválidos' });
+  }
+
+  try {
+    const [[item]] = await db.query('SELECT quantidade, nome FROM estoque WHERE id = ?', [id]);
+    if (!item) return res.status(404).json({ erro: 'Item não encontrado' });
+
+    if (item.quantidade < quantidade) {
+      return res.status(400).json({ erro: 'Quantidade insuficiente no estoque' });
+    }
+
+    await db.query('UPDATE estoque SET quantidade = quantidade - ? WHERE id = ?', [quantidade, id]);
+    await db.query('INSERT INTO lancamentos (descricao, categoria, tipo, data_lancamento) VALUES (?, "estoque", "saida", NOW())',
+      [descricao || `Baixa de ${quantidade} do item ${item.nome}`]
+    );
+
+    res.json({ mensagem: 'Baixa de estoque realizada com sucesso' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao realizar baixa' });
+  }
+});
+
 app.get('/api/lancamentos', async (req, res) => {
   try {
-    const [dados] = await db.query('SELECT * FROM lancamentos ORDER BY data DESC');
-    res.json(dados);
+    const { page = 1, limit = 10, descricao, categoria, tipo, sortBy = 'data_lancamento', sortOrder = 'DESC' } = req.query;
+    const offset = (page - 1) * limit;
+
+    const validColumns = ['id', 'descricao', 'categoria', 'tipo', 'data_lancamento'];
+    const column = validColumns.includes(sortBy) ? sortBy : 'data_lancamento';
+    const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    let query = 'SELECT * FROM lancamentos';
+    let countQuery = 'SELECT COUNT(*) as total FROM lancamentos';
+    const params = [];
+    const countParams = [];
+    const conditions = [];
+
+    if (descricao) {
+      conditions.push('descricao LIKE ?');
+      params.push(`%${descricao}%`);
+      countParams.push(`%${descricao}%`);
+    }
+    if (categoria) {
+      conditions.push('categoria = ?');
+      params.push(categoria);
+      countParams.push(categoria);
+    }
+    if (tipo) {
+      conditions.push('tipo = ?');
+      params.push(tipo);
+      countParams.push(tipo);
+    }
+
+    if (conditions.length > 0) {
+      const whereClause = ' WHERE ' + conditions.join(' AND ');
+      query += whereClause;
+      countQuery += whereClause;
+    }
+
+    query += ` ORDER BY ${column} ${order} LIMIT ? OFFSET ?`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [dados] = await db.query(query, params);
+    const [[{ total }]] = await db.query(countQuery, countParams);
+
+    res.json({
+      lancamentos: dados,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     console.error('Erro ao buscar lançamentos:', error);
     res.status(500).json({ erro: 'Erro ao buscar lançamentos' });
   }
 });
-
 // Rota para adicionar lançamento
 app.post('/api/lancamentos', async (req, res) => {
-  const { descricao, valor, categoria, data_lancamento, tipo } = req.body;
-  if (!descricao || !valor || !data_lancamento) {
-    return res.status(400).json({ erro: 'Campos obrigatórios não preenchidos.' });
+  const { descricao, categoria, data_lancamento, tipo } = req.body;
+  if (!descricao || !data_lancamento) {
+    return res.status(400).json({ erro: 'Descrição e data de lançamento são obrigatórios.' });
   }
   try {
-    await db.query('INSERT INTO lancamentos (descricao, valor, categoria, data_lancamento, tipo) VALUES (?, ?, ?, ?, ?)', 
-    [descricao, valor, categoria, data_lancamento, tipo]);
-    res.json({ mensagem: 'Lançamento cadastrado com sucesso.' });
+    const [result] = await db.query(
+      'INSERT INTO lancamentos (descricao, categoria, data_lancamento, tipo) VALUES (?, ?, ?, ?)',
+      [descricao, categoria, data_lancamento, tipo]
+    );
+    res.json({ mensagem: 'Lançamento cadastrado com sucesso.', id: result.insertId });
   } catch (error) {
     console.error('Erro ao adicionar lançamento:', error);
     res.status(500).json({ erro: 'Erro ao adicionar lançamento' });
   }
 });
 
+app.get('/api/entregadores-disponiveis', async (req, res) => {
+  try {
+    const [entregadores] = await db.query(`
+      SELECT id, nome FROM usuarios WHERE cargo = 'entregador'
+    `);
+    res.json(entregadores);
+  } catch (err) {
+    console.error('Erro ao buscar entregadores:', err);
+    res.status(500).json({ erro: 'Erro ao buscar entregadores' });
+  }
+});
+
+
+app.post('/api/atribuir-entregas', async (req, res) => {
+  const { entregador_id, pedidos } = req.body;
+  const minimo = 1;
+
+  if (!entregador_id || !Array.isArray(pedidos) || pedidos.length < minimo) {
+    return res.status(400).json({ erro: `Selecione no mínimo ${minimo} pedidos e um entregador.` });
+  }
+
+  try {
+    for (const pedido_id of pedidos) {
+      await db.query(`
+        INSERT INTO entregas (pedido_id, cliente_numero, recebido, rota, entregador_id, data_pedido, status)
+        SELECT 
+          pd.id, pd.cliente_numero, pd.recebido, 1, ?, pd.data, 'rua'
+        FROM pedidos_diarios pd
+        WHERE pd.id = ?
+      `, [entregador_id, pedido_id]);
+
+      await db.query(`UPDATE pedidos_diarios SET status = 'rua' WHERE id = ?`, [pedido_id]);
+    }
+
+    res.json({ mensagem: `Entregas atribuídas com sucesso para entregador ${entregador_id}` });
+  } catch (err) {
+    console.error('Erro ao atribuir entregas:', err);
+    res.status(500).json({ erro: 'Erro ao atribuir entregas' });
+  }
+});
+
+
 // Rota para editar lançamento
 app.put('/api/lancamentos/:id', async (req, res) => {
   const { id } = req.params;
-  const { descricao, valor, categoria, data_lancamento, tipo } = req.body;
+  const { descricao, categoria, data_lancamento, tipo } = req.body;
+  if (!descricao || !data_lancamento) {
+    return res.status(400).json({ erro: 'Descrição e data de lançamento são obrigatórios.' });
+  }
   try {
-    await db.query('UPDATE lancamentos SET descricao = ?, valor = ?, categoria = ?, data_lancamento = ?, tipo = ? WHERE id = ?', 
-    [descricao, valor, categoria, data_lancamento, tipo, id]);
+    const [result] = await db.query(
+      'UPDATE lancamentos SET descricao = ?, categoria = ?, data_lancamento = ?, tipo = ? WHERE id = ?',
+      [descricao, categoria, data_lancamento, tipo, id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erro: 'Lançamento não encontrado.' });
+    }
     res.json({ mensagem: 'Lançamento atualizado com sucesso.' });
   } catch (error) {
     console.error('Erro ao atualizar lançamento:', error);
@@ -329,14 +506,16 @@ app.put('/api/lancamentos/:id', async (req, res) => {
 app.delete('/api/lancamentos/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await db.query('DELETE FROM lancamentos WHERE id = ?', [id]);
+    const [result] = await db.query('DELETE FROM lancamentos WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erro: 'Lançamento não encontrado.' });
+    }
     res.json({ mensagem: 'Lançamento deletado com sucesso.' });
   } catch (error) {
     console.error('Erro ao deletar lançamento:', error);
     res.status(500).json({ erro: 'Erro ao deletar lançamento' });
   }
 });
-
 
 app.get('/api/dashboard', async (req, res) => {
   try {
@@ -542,7 +721,7 @@ app.get('/api/entregas', async (req, res) => {
   try {
     const status = req.query.status || 'rua';
     const [entregas] = await db.query(`
-      SELECT pedido_id, entregador_id, endereco, hora_inicio
+      SELECT pedido_id, entregador_id, hora_inicio
       FROM entregas
       WHERE status = ?
       ORDER BY hora_inicio DESC
@@ -580,9 +759,12 @@ app.get('/api/vendas', async (req, res) => {
       params.push(`%${cliente_numero}%`);
     }
     if (data_inicio) {
-      whereClauses.push('DATE(v.data) >= ?');
-      params.push(data_inicio);
-    }
+  whereClauses.push('DATE(v.data) >= ?');
+  params.push(data_inicio);
+} else {
+  whereClauses.push('DATE(v.data) = CURDATE()');
+}
+
     if (data_fim) {
       whereClauses.push('DATE(v.data) <= ?');
       params.push(data_fim);
@@ -599,7 +781,6 @@ app.get('/api/vendas', async (req, res) => {
         COALESCE(v.valor_total, 0) AS valor_total,
         COALESCE(v.forma_pagamento, 'pix') AS forma_pagamento,
         COALESCE(v.data, NOW()) AS data,
-        COALESCE(v.endereco, '') AS endereco,
         COALESCE(v.status, 'novo') AS status,
         v.comprovante IS NOT NULL AS tem_comprovante,
         GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) AS produtos
@@ -623,7 +804,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Rota ajustada para criação de pedido sem obrigatoriedade de valor_pago, exceto para pagamentos em dinheiro ou pix+dinheiro
 app.post('/api/pedido_manual', upload.single('comprovante'), async (req, res) => {
-  const { cliente_numero, forma_pagamento, endereco, itens, valor_pago, valor_dinheiro } = req.body;
+  const { cliente_numero, forma_pagamento, itens, valor_pago, valor_dinheiro } = req.body;
   let itensParsed;
 try {
   itensParsed = typeof itens === 'string' ? JSON.parse(itens) : itens;
@@ -636,7 +817,6 @@ try {
     !cliente_numero ||
     !forma_pagamento ||
     !validPaymentMethods.includes(forma_pagamento) ||
-    !endereco ||
     !Array.isArray(itensParsed) ||
     itensParsed.length === 0
   ) {
@@ -685,25 +865,24 @@ try {
 
     // Inserir venda
     const [venda] = await conn.query(`
-      INSERT INTO vendas (cliente_numero, forma_pagamento, comprovante, valor_total, valor_pago, valor_dinheiro, endereco, status, data, lancameto)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'novo', NOW(), 'manual')
+      INSERT INTO vendas (cliente_numero, forma_pagamento, comprovante, valor_total, valor_pago, valor_dinheiro, status, data, lancameto)
+      VALUES (?, ?, ?, ?, ?, ?, 'novo', NOW(), 'manual')
     `, [
       cliente_numero,
       forma_pagamento,
       comprovanteFile,
       valor_total,
       (forma_pagamento === 'pix+dinheiro' || forma_pagamento === 'dinheiro') ? parseFloat(valor_pago || 0) : null,
-      (forma_pagamento === 'pix+dinheiro') ? parseFloat(valor_dinheiro || 0) : null,
-      endereco
+      (forma_pagamento === 'pix+dinheiro') ? parseFloat(valor_dinheiro || 0) : null
     ]);
 
     const vendaId = venda.insertId;
 
     // Inserir pedido
     const [pedido] = await conn.query(`
-      INSERT INTO pedidos_diarios (cliente_numero, venda_id, data, endereco, status)
-      VALUES (?, ?, NOW(), ?, 'novo')
-    `, [cliente_numero, vendaId, endereco]);
+      INSERT INTO pedidos_diarios (cliente_numero, venda_id, data, status)
+      VALUES (?, ?, NOW(), 'novo')
+    `, [cliente_numero, vendaId]);
 
     const pedidoId = pedido.insertId;
 
@@ -714,9 +893,6 @@ try {
         VALUES (?, ?, ?)
       `, [pedidoId, item.produto_id, item.quantidade]);
 
-      await conn.query(`
-        UPDATE estoque SET quantidade = quantidade - ? WHERE id = ?
-      `, [item.quantidade, item.produto_id]);
     }
 
     await conn.commit();
@@ -1132,7 +1308,6 @@ app.get('/api/entregas/:id', async (req, res) => {
         pedido_id,
         cliente_numero,
         itens,
-        endereco,
         status,
         rota,
         entregador_id,
@@ -1186,7 +1361,6 @@ app.get('/api/entregas', async (req, res) => {
         e.pedido_id,
         e.cliente_numero,
         e.itens,
-        e.endereco,
         e.status,
         e.rota,
         e.entregador_id,
@@ -1380,7 +1554,6 @@ app.get('/api/pedidos/:id', async (req, res) => {
       SELECT 
         pd.id AS pedido_id,
         pd.cliente_numero,
-        pd.endereco,
         pd.status,
         pd.data_hora AS data_pedido,
         COALESCE(v.forma_pagamento, '-') AS forma_pagamento,
@@ -1417,6 +1590,7 @@ app.get('/api/pedidos_pendentes', async (req, res) => {
           pd.status,
           pd.valido,
           pd.venda_id,
+          pd.numero_diario,
           v.valor_total AS valor_total
       FROM pedidos_diarios pd
       LEFT JOIN vendas v ON pd.venda_id = v.id

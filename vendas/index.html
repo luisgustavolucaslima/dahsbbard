@@ -149,13 +149,6 @@
           <input type="file" id="comprovante" accept="image/*">
         </div>
       </div>
-
-      <div class="field">
-        <label class="label">Endereço</label>
-        <div class="control">
-          <input class="input" id="enderecoPedido" placeholder="Rua Exemplo, 123 - Bairro">
-        </div>
-      </div>
     </section>
     <footer class="modal-card-foot">
       <button class="button is-success" type="button" id="confirmarPedidoBtn">Salvar Pedido</button>
@@ -191,14 +184,16 @@
             <span><b>Gerente de Vendas</b></span>
           </div>
         </div>
-        <div class="menu is-menu-main">
-          <p class="menu-label">Geral</p>
-          <ul class="menu-list">
-            <li><a href="index.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-            <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
-              <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-          </ul>
-        </div>
+       <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+        <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+    </div>
       </aside>
       <section class="section is-title-bar">
         <div class="level">
@@ -231,6 +226,7 @@
           <span class="icon"><i class="mdi mdi-truck-delivery"></i></span>
           <span>Ver Entregas</span>
         </a>
+        <a class="button is-link is-light" onclick="abrirModalEntrega()">🚚 Enviar para Entrega</a>
   </div>
 </section>
             </div>
@@ -256,7 +252,7 @@
               <table class="table is-fullwidth is-striped is-hoverable">
                 <thead>
                   <tr>
-                    <th>ID Pedido</th>
+                    <th>Numero pedido Diario</th>
                     <th>Cliente</th>
                     <th>Valor Total</th>
                     <th>Ações</th>
@@ -315,12 +311,11 @@
               <table class="table is-fullwidth is-striped is-hoverable is-bordered">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th>ID da venda</th>
                     <th>Cliente</th>
                     <th>Valor Pago</th>
                     <th>Forma de Pagamento</th>
                     <th>Data</th>
-                    <th>Endereço</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -329,6 +324,50 @@
             </div>
           </div>
         </div>
+        <div class="modal" id="modalConfirmacao">
+  <div class="modal-background" onclick="fecharModalConfirmacao()"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title" id="tituloConfirmacao">Confirmação</p>
+      <button class="delete" aria-label="close" onclick="fecharModalConfirmacao()"></button>
+    </header>
+    <section class="modal-card-body">
+      <p id="mensagemConfirmacao">Tem certeza que deseja realizar esta ação?</p>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-danger" id="btnConfirmarAcao">Confirmar</button>
+      <button class="button" onclick="fecharModalConfirmacao()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+<div class="modal" id="modalEntrega">
+  <div class="modal-background" onclick="fecharModalEntrega()"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Selecionar Entregador</p>
+      <button class="delete" aria-label="close" onclick="fecharModalEntrega()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Entregador</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="entregadorSelect"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Pedidos para Entrega</label>
+        <div id="listaPedidosEntrega" class="table-container"></div>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" onclick="atribuirEntregas()">Confirmar</button>
+      <button class="button" onclick="fecharModalEntrega()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+
       </section>
       <footer class="footer">
         <div class="container-fluid">
@@ -581,13 +620,12 @@ function verComprovante(id) {
           pedidos.forEach(pedido => {
             const row = document.createElement('tr');
             row.innerHTML = `
-              <td>${pedido.id}</td>
+              <td>${pedido.numero_diario}</td>
               <td>${formatarCliente(pedido.cliente_numero)}</td>
               <td>R$ ${parseFloat(pedido.valor_total || 0).toFixed(2)}</td>
               <td>
                 <button class="button is-small is-link" onclick="verComprovante(${pedido.id})">📥</button>
-                <button class="button is-small is-success" onclick="aprovarPedido(${pedido.id})">✅</button>
-                <button class="button is-small is-danger" onclick="negarPedido(${pedido.id})">❌</button>
+                <button id="aprovar-btn-${pedido.id}" class="button is-small is-success" onclick="confirmarAcao('Deseja realmente aprovar o pedido ${pedido.id}?', () => aprovarPedido(${pedido.id}))">✅</button>   <button class="button is-small is-danger" onclick="confirmarAcao('Deseja realmente negar o pedido ${pedido.id}?', () => negarPedido(${pedido.id}))">❌</button>
                 <button class="button is-small is-warning" onclick="editarPagamento(${pedido.id})">💳</button>
                 <button class="button is-small is-info" onclick="editarItens(${pedido.id})">🧾</button>
                 <button class="button is-small is-info" onclick="informacoesDoPedido(${pedido.id})">🔍 Ver Pedido</button>
@@ -604,20 +642,32 @@ function verComprovante(id) {
       }
 
       // Aprovar Pedido
-      async function aprovarPedido(id) {
-        try {
-          const response = await fetch('/valido', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, valido: 1 })
-          });
-          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-          showNotification('Pedido aprovado com sucesso!', 'success');
-          atualizarPedidosPendentes();
-        } catch (err) {
-    showNotification("Erro: " + err.message, "danger");
+     async function aprovarPedido(id) {
+  try {
+    // Desativa botão durante a requisição (opcional se tiver botão com id específico)
+    const btn = document.querySelector(`#aprovar-btn-${id}`);
+    if (btn) btn.disabled = true;
+
+    const response = await fetch('/valido', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, valido: 1 })
+    });
+
+    if (!response.ok) {
+      const erro = await response.text();
+      throw new Error(`Erro do servidor: ${erro}`);
+    }
+
+    showNotification('Pedido aprovado e estoque atualizado com sucesso!', 'success');
+    atualizarPedidosPendentes(); // ou atualizarVendas() dependendo do contexto
+  } catch (err) {
+    showNotification("Erro ao aprovar pedido: " + err.message, "danger");
+  } finally {
+    if (btn) btn.disabled = false;
   }
-      }
+}
+
 
       // Negar Pedido
       async function negarPedido(id) {
@@ -653,7 +703,6 @@ function verComprovante(id) {
               <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
               <td>${venda.forma_pagamento}</td>
               <td>${formatarData(venda.data)}</td>
-              <td>${venda.endereco}</td>
               <td>${venda.status}</td>
             `;
             tbody.appendChild(row);
@@ -855,12 +904,11 @@ document.getElementById('listaProdutos').addEventListener('click', (e) => {
 
 document.getElementById('confirmarPedidoBtn').addEventListener('click', async () => {
   const cliente = document.getElementById('clienteNumero').value.trim();
-  const pagamento = document.getElementById('formaPagamento').value;
-  const endereco = document.getElementById('enderecoPedido').value.trim();
+  const pagamento = document.getElementById('formaPagamento').value
   const valorPago = document.getElementById('valorPago').value;
   const comprovanteFile = document.getElementById('comprovante').files[0];
 
-  if (!cliente || !pagamento || !endereco || endereco.length < 5 || !endereco.match(/[0-9]/)) {
+  if (!cliente || !pagamento ) {
     mostrarToast('Preencha todos os campos obrigatórios.', false);
     return;
   }
@@ -880,7 +928,6 @@ document.getElementById('confirmarPedidoBtn').addEventListener('click', async ()
   const formData = new FormData();
   formData.append('cliente_numero', cliente);
   formData.append('forma_pagamento', pagamento);
-  formData.append('endereco', endereco);
   formData.append('itens', JSON.stringify(produtos));
 if (valorPago) {
   formData.append('valor_pago', valorPago); // SEMPRE envia
@@ -920,7 +967,23 @@ function mostrarToast(msg, sucesso = true) {
 }
 
 
+let acaoConfirmada = null;
 
+function confirmarAcao(mensagem, callback) {
+  document.getElementById('mensagemConfirmacao').textContent = mensagem;
+  document.getElementById('modalConfirmacao').classList.add('is-active');
+  acaoConfirmada = callback;
+}
+
+document.getElementById('btnConfirmarAcao').addEventListener('click', () => {
+  if (acaoConfirmada) acaoConfirmada();
+  fecharModalConfirmacao();
+});
+
+function fecharModalConfirmacao() {
+  document.getElementById('modalConfirmacao').classList.remove('is-active');
+  acaoConfirmada = null;
+}
 
 </script>
   
@@ -984,9 +1047,8 @@ function mostrarToast(msg, sucesso = true) {
     </header>
     <section class="modal-card-body">
       <div id="detalhesPedidoContent">
-        <p><strong>ID do Pedido:</strong> <span id="infoId"></span></p>
+        <p><strong>Numero do pedido diario:</strong> <span id="infoId"></span></p>
         <p><strong>Cliente:</strong> <span id="infoCliente"></span></p>
-        <p><strong>Endereço:</strong> <span id="infoEndereco"></span></p>
         <p><strong>Produtos:</strong> <span id="infoProdutos"></span></p>
         <p><strong>Valor Total:</strong> R$ <span id="infoValor"></span></p>
         <p><strong>Forma de Pagamento:</strong> <span id="infoPagamento"></span></p>
@@ -1001,6 +1063,70 @@ function mostrarToast(msg, sucesso = true) {
 </div>
 
 <script>
+
+
+function abrirModalEntrega() {
+  document.getElementById('modalEntrega').classList.add('is-active');
+  carregarEntregadores();
+  carregarPedidosParaEntrega();
+}
+
+function fecharModalEntrega() {
+  document.getElementById('modalEntrega').classList.remove('is-active');
+}
+
+async function carregarEntregadores() {
+  const res = await fetch('/api/entregadores-disponiveis');
+  const dados = await res.json();
+  const select = document.getElementById('entregadorSelect');
+  select.innerHTML = '<option value="">Selecione</option>';
+  dados.forEach(e => {
+    select.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+  });
+}
+
+async function carregarPedidosParaEntrega() {
+  const res = await fetch('/pedidos_diarios');
+  const pedidos = await res.json();
+  const lista = pedidos.filter(p => p.status === 'entrega');
+  const container = document.getElementById('listaPedidosEntrega');
+  container.innerHTML = `
+    <table class="table is-fullwidth is-bordered">
+      <thead><tr><th>#</th><th>Cliente</th></tr></thead>
+      <tbody>
+        ${lista.map(p => `
+          <tr>
+            <td>${p.numero_diario}</td>
+            <td>${p.cliente_numero}</td
+            <td><input type="checkbox" class="checkPedidoEntrega" value="${p.id}"></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function atribuirEntregas() {
+  const entregador_id = document.getElementById('entregadorSelect').value;
+  const selecionados = [...document.querySelectorAll('.checkPedidoEntrega:checked')].map(el => parseInt(el.value));
+
+  if (!entregador_id || selecionados.length < 1) {
+    showNotification('Selecione um entregador e ao menos 1 pedidos.', 'warning');
+    return;
+  }
+
+  const res = await fetch('/api/atribuir-entregas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entregador_id, pedidos: selecionados })
+  });
+
+  const data = await res.json();
+  showNotification(data.mensagem || 'Entregas atribuídas.');
+  fecharModalEntrega();
+  atualizarPedidosPendentes?.();
+}
+
+
 function informacoesDoPedido(id) {
   fetch('/api/pedidos/' + id)
     .then(res => res.json())
@@ -1015,9 +1141,6 @@ function informacoesDoPedido(id) {
 
       document.getElementById('infoCliente').textContent =
         p.cliente_numero?.replace('@c.us', '') || "-";
-
-      document.getElementById('infoEndereco').textContent =
-        p.endereco || "-";
 
       document.getElementById('infoProdutos').textContent =
         p.itens || p.produtos || "-";

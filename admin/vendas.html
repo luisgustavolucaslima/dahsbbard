@@ -117,21 +117,21 @@
             <span><b>Admin</b></span>
           </div>
         </div>
-        <div class="menu is-menu-main">
-          <p class="menu-label">Geral</p>
-          <ul class="menu-list">
-            <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-            <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
-            <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-            <li><a href="despesas.html" class="has-icon"><span class="icon"><i class="mdi mdi-currency-brl"></i></span><span class="menu-item-label">Despesas</span></a></li>
-          </ul>
-          <p class="menu-label">Logic Ice</p>
-          <ul class="menu-list">
-            <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
-            <li><a href="vendas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
-            <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
-          </ul>
-        </div>
+       <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+      <ul class="menu-list">
+        <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+        <li><a href="vendas.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+        <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
+      </ul>
+    </div>
       </aside>
       <section class="section is-title-bar">
         <div class="level">
@@ -333,12 +333,6 @@
                   </div>
                 </div>
                 <div class="field">
-                  <label class="label">Endereço</label>
-                  <div class="control">
-                    <input class="input" type="text" id="editEndereco" readonly>
-                  </div>
-                </div>
-                <div class="field">
                   <label class="label">Status</label>
                   <div class="control">
                     <div class="select is-fullwidth">
@@ -393,7 +387,6 @@
       <div id="detalhesPedidoContent">
         <p><strong>ID do Pedido:</strong> <span id="infoId"></span></p>
         <p><strong>Cliente:</strong> <span id="infoCliente"></span></p>
-        <p><strong>Endereço:</strong> <span id="infoEndereco"></span></p>
         <p><strong>Produtos:</strong> <span id="infoProdutos"></span></p>
         <p><strong>Valor Total:</strong> R$ <span id="infoValor"></span></p>
         <p><strong>Forma de Pagamento:</strong> <span id="infoPagamento"></span></p>
@@ -473,7 +466,6 @@
               <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
               <td>${venda.forma_pagamento}</td>
               <td>${formatarData(venda.data)}</td>
-              <td>${venda.endereco}</td>
               <td>${venda.status}</td>
               <td>
                 <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
@@ -536,7 +528,6 @@
               <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
               <td>${venda.forma_pagamento}</td>
               <td>${formatarData(venda.data)}</td>
-              <td>${venda.endereco}</td>
               <td>${venda.status}</td>
               <td>
                 <button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(venda)})'>Editar</button>
@@ -584,9 +575,6 @@ function informacoesDoPedido(id) {
       document.getElementById('infoCliente').textContent =
         p.cliente_numero?.replace('@c.us', '') || "-";
 
-      document.getElementById('infoEndereco').textContent =
-        p.endereco || "-";
-
       document.getElementById('infoProdutos').textContent =
         p.itens || p.produtos || "-";
 
@@ -621,7 +609,6 @@ async function abrirEditModal(venda) {
   document.getElementById('editValorPago').value = parseFloat(venda.valor_total || 0).toFixed(2);
   document.getElementById('editFormaPagamento').value = venda.forma_pagamento;
   document.getElementById('editData').value = formatarData(venda.data);
-  document.getElementById('editEndereco').value = venda.endereco;
   document.getElementById('editStatus').value = venda.status;
 
   if (venda.tem_comprovante) {

@@ -1,666 +1,812 @@
-const moment = require('moment');
-const axios = require('axios');
-const PQueue = require('p-queue').default;
+const { tratarOrganizarRota, configurarOrganizarRota, getSubmenuOrganizarRota, tratarCallbackOrganizarRota } = require('./entregas/organizar');
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'AIzaSyBpqMDBX4ic49y85K4-3dNJyxkZwD2rZ9c';
-const apiQueue = new PQueue({ concurrency: 5 });
-const MAX_API_CALLS_PER_DAY = 1000;
-let apiCallCount = 0;
-
-// Função para enviar mensagem com timeout de exclusão
-const enviarMensagem = async (chatId, mensagem, bot, options = {}) => {
-  try {
-    const sentMessage = await bot.sendMessage(chatId, mensagem, { parse_mode: 'Markdown', ...options });
-    setTimeout(async () => {
-      try {
-        await bot.deleteMessage(chatId, sentMessage.message_id);
-      } catch (err) {
-        console.error(`[ERROR] Erro ao deletar mensagem ${sentMessage.message_id}:`, err.message);
-      }
-    }, 30000);
-    return sentMessage;
-  } catch (err) {
-    console.error(`[ERROR] Erro ao enviar mensagem para ${chatId}:`, err.message);
-    return null;
-  }
-};
-
-// Função para calcular distância e tempo com retry
-async function calculateDistance(origins, destinations, bot, chatId, retries = 3) {
-  if (apiCallCount >= MAX_API_CALLS_PER_DAY) {
-    console.error('[ERROR] Cota diária da API atingida');
-    await enviarMensagem(chatId, '⚠️ *Limite de chamadas à API atingido. Tente novamente mais tarde.*', bot);
-    return destinations.map(() => ({ distance: 'N/A', duration: 'N/A' }));
-  }
-  apiCallCount++;
-  console.log(`[DEBUG] Contagem de chamadas à API: ${apiCallCount}`);
-  if (apiQueue.size > 0) {
-    await enviarMensagem(chatId, '⏳ *Calculando rota... Aguarde um momento.*', bot);
-  }
-
-  return apiQueue.add(async () => {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const response = await axios.get('https://maps.googleapis.com/maps/api/distancematrix/json', {
-          params: {
-            origins: origins.join('|'),
-            destinations: destinations.join('|'),
-            key: GOOGLE_API_KEY,
-          },
-          timeout: 10000,
-        });
-        if (response.data.status !== 'OK') {
-          throw new Error(`Erro na API do Google: ${response.data.error_message || response.data.status}`);
-        }
-        return response.data.rows[0].elements.map(element => {
-          if (element.status !== 'OK') {
-            return { distance: 'N/A', duration: 'N/A' };
-          }
-          return {
-            distance: element.distance.text,
-            duration: element.duration.text,
-          };
-        });
-      } catch (error) {
-        console.warn(`[DEBUG] Tentativa ${attempt} da API de distância falhou: ${error.message}`);
-        if (attempt === retries) {
-          console.error('[ERROR] Máximo de tentativas atingido para a API de distância:', error);
-          return destinations.map(() => ({ distance: 'N/A', duration: 'N/A' }));
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      }
-    }
-  });
+// Função para gerar o menu principal
+function getMenuPrincipal() {
+  return {
+    inline_keyboard: [
+      [{ text: '📦 Pedidos', callback_data: 'submenu_pedidos' }],
+      [{ text: '🗺️ Organizar Rota', callback_data: 'submenu_organizar_rota' }],
+      [{ text: '💰 Valores a Receber', callback_data: 'valores_receber' }],
+      [{ text: 'ℹ️ Ajuda', callback_data: 'ajuda' }],
+      [{ text: '🛑 Sair', callback_data: 'sair' }]
+    ]
+  };
 }
 
-// Exibir menu inicial
-const showInitialMenu = async (chatId, nomeUsuario, bot) => {
-  const keyboard = {
+// Função para gerar o submenu de pedidos
+function getSubmenuPedidos() {
+  return {
     inline_keyboard: [
-      [{ text: '🚚 Iniciar Rota', callback_data: 'iniciar_rota' }],
-      [{ text: '🛑 Sair', callback_data: 'sair' }],
-    ],
+      [{ text: '📋 Listar Pedidos', callback_data: 'lista' }],
+      [{ text: '🔍 Ver Detalhes de Pedido', callback_data: 'pedidos' }],
+      [{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]
+    ]
   };
-  return enviarMensagem(
-    chatId,
-    `👋 *Bem-vindo ao setor Entrega, ${nomeUsuario || 'Usuário'}!* 😊\nEscolha uma opção:`,
-    bot,
-    { reply_markup: keyboard }
-  );
-};
+}
 
-module.exports = async function tratarEntrega(texto, msg, sessao, db, bot, chatId, sessoes) {
-  if (!sessao) {
-    console.error('[ERROR] Sessão não definida ao chamar entrega.js');
-    return enviarMensagem(chatId, '⚠️ *Erro interno: sessão não encontrada. Tente novamente.*', bot);
+// Função auxiliar para listar pedidos pendentes
+async function listarPedidosPendentes(chatId, sessao, db, enviarMensagem) {
+  try {
+    const [pedidos] = await db.query(`
+      SELECT e.id, e.pedido_id, e.cliente_numero, e.status
+      FROM entregas e
+      JOIN pedidos_diarios p ON e.pedido_id = p.id
+      WHERE p.valido = 1 AND e.status IN ('0', 'rua') AND e.entregador_id = ?
+      ORDER BY e.id
+    `, [sessao.usuario_id]);
+    console.log(`[DEBUG] Pedidos encontrados: ${pedidos.length}`);
+    if (pedidos.length === 0) {
+      await enviarMensagem(chatId, '📭 *Nenhum pedido atribuído a você no momento.*', {
+        reply_markup: getSubmenuPedidos()
+      });
+      return;
+    }
+    const lista = pedidos.map(p => `📦 Pedido #${p.id}\n📞 ${p.cliente_numero}`).join('\n\n');
+    await enviarMensagem(chatId, `📋 *Lista de Pedidos Atribuídos:*\n\n${lista}`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔍 Ver Detalhes de Pedido', callback_data: 'pedidos' }],
+          [{ text: '⬅️ Voltar', callback_data: 'submenu_pedidos' }, { text: '🛑 Sair', callback_data: 'sair' }]
+        ]
+      }
+    });
+  } catch (err) {
+    console.error(`[ERROR] Erro ao buscar pedidos: ${err.message}`);
+    await enviarMensagem(chatId, '⚠️ *Erro ao buscar os pedidos.*', {
+      reply_markup: getSubmenuPedidos()
+    });
+  }
+}
+
+async function tratarEntrega(texto, msg, sessao, db, bot, chatId, sessoes, enviarMensagem) {
+  chatId = chatId || msg.chat.id.toString();
+
+  // Corrige se texto for um objeto (query do botão)
+  if (typeof texto === 'object' && texto.data) {
+    msg = texto;
+    texto = texto.data;
+  } else if (msg?.data) {
+    texto = msg.data;
+  } else if (msg?.text) {
+    texto = msg.text;
   }
 
-  const ehCallback = typeof texto === 'object' && texto.data;
-  texto = ehCallback ? texto.data : (texto || msg.text || '').toLowerCase();
-  if (!sessao.subetapa) sessao.subetapa = null;
+  texto = (texto || '').toString().trim();
+  console.log(`[DEBUG] tratarEntrega chamado: chatId=${chatId}, texto=${texto}`);
 
-  // Timeout check
-  if (sessao.rota && Date.now() - sessao.lastUpdated > 15 * 60 * 1000) {
-    delete sessao.rota;
-    sessao.subetapa = null;
-    sessao.pedidoIdConfirmacao = null;
-    sessao.valorEsperado = null;
-    sessao.lastUpdated = Date.now();
-    await enviarMensagem(chatId, '🕒 *Sessão expirada. O fluxo foi reiniciado.*', bot);
-    return showInitialMenu(chatId, sessao.nome, bot);
+  // Inicializa a sessão se necessário
+// Função auxiliar para verificar estado do entregador
+async function checkDeliveryStatus(db, usuarioId) {
+  const [pedidosPendentes] = await db.query(`
+    SELECT e.id
+    FROM entregas e
+    JOIN pedidos_diarios p ON e.pedido_id = p.id
+    WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+  `, [usuarioId]);
+  const [rotaAtiva] = await db.query(`
+    SELECT id FROM rotas_salvas WHERE entregador_id = ? AND hora_fim IS NULL LIMIT 1
+  `, [usuarioId]);
+  return {
+    hasPendingDeliveries: pedidosPendentes.length > 0,
+    hasActiveRoute: rotaAtiva.length > 0,
+    pendingCount: pedidosPendentes.length
+  };
+}
+
+// Inicializa a sessão se necessário
+if (!sessoes.has(chatId)) {
+  const initialState = {
+    etapa: 'menu',
+    locations: [],
+    pontoInicial: null,
+    pedidoId: null,
+    submenu: null,
+    rotaAtiva: false,
+    entregadorRotaId: null
+  };
+  // Verificar estado do entregador
+  const status = await checkDeliveryStatus(db, sessao.usuario_id);
+  if (status.hasPendingDeliveries || status.hasActiveRoute) {
+    initialState.rotaAtiva = true;
+    initialState.etapa = 'submenu_organizar_rota';
+    initialState.submenu = 'organizar_rota';
+    sessoes.set(chatId, initialState);
+    await enviarMensagem(chatId, `🚚 *Você tem uma rota ativa com ${status.pendingCount} pedido(s) pendente(s). Gerencie sua rota:`, {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+    await listarPedidosPendentes(chatId, { ...initialState, usuario_id: sessao.usuario_id }, db, enviarMensagem);
+    return;
+  }
+  sessoes.set(chatId, initialState);
+  await enviarMensagem(chatId, '🚚 *Bem-vindo ao painel do entregador!* Escolha uma opção:', {
+    reply_markup: getMenuPrincipal()
+  });
+  return;
+}
+
+  const sessaoAtual = sessoes.get(chatId);
+  console.log(`[DEBUG] Estado da sessão: ${JSON.stringify(sessaoAtual)}`);
+
+  // Voltar ao menu principal
+  if (texto === 'voltar_menu' || (msg && msg.data === 'voltar_menu')) {
+    sessaoAtual.etapa = 'menu';
+    sessaoAtual.submenu = null;
+    sessaoAtual.pedidoId = null;
+    sessaoAtual.pontoInicial = null;
+    sessaoAtual.locations = [];
+    sessaoAtual.justificativaSelecionada = null;
+    sessoes.set(chatId, sessaoAtual);
+    await enviarMensagem(chatId, '🚚 *Bem-vindo ao painel do entregador!* Escolha uma opção:', {
+      reply_markup: getMenuPrincipal()
+    });
+    return;
   }
 
-  // Manipular callbacks
-  if (ehCallback) {
-    const query = texto;
-    const data = query.data;
+  // Sair do fluxo
+  if (texto === 'sair' || (msg && msg.data === 'sair')) {
+    sessoes.delete(chatId);
+    await enviarMensagem(chatId, '🛑 *Você saiu do fluxo.* Para começar, envie *oi* ou sua senha pessoal.');
+    return;
+  }
+
+  // Comando de ajuda
+  if (texto === 'ajuda' || (msg && msg.data === 'ajuda')) {
+    await enviarMensagem(chatId, 'ℹ️ *Ajuda:*\n- 📦 Pedidos: Gerencie pedidos (listar, detalhes, status).\n- 🗺️ Organizar Rota: Inicie/finalize rotas e planeje entregas.\n- 💰 Valores a Receber: Veja o total a receber em dinheiro ou pix+dinheiro.', {
+      reply_markup: {
+        inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]]
+      }
+    });
+    return;
+  }
+
+  // Submenu Pedidos
+if ((texto === 'submenu_pedidos' || (msg && msg.data === 'submenu_pedidos')) &&
+    sessaoAtual.etapa !== 'submenu_pedidos') {
+  sessaoAtual.etapa = 'submenu_pedidos';
+  sessaoAtual.submenu = 'pedidos';
+  sessoes.set(chatId, sessaoAtual);
+  await enviarMensagem(chatId, '📦 *Menu de Pedidos:* Escolha uma opção:', {
+    reply_markup: getSubmenuPedidos()
+  });
+  return;
+}
+
+
+  // Submenu Organizar Rota
+  if (texto === 'submenu_organizar_rota' || (msg && msg.data === 'submenu_organizar_rota')) {
+    sessaoAtual.etapa = 'submenu_organizar_rota';
+    sessaoAtual.submenu = 'organizar_rota';
+    sessoes.set(chatId, sessaoAtual);
+    await enviarMensagem(chatId, '🗺️ *Menu de Rota:* Escolha uma opção:', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+    return;
+  }
+
+  // Iniciar Rota
+if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
+  console.log(`[DEBUG] Iniciando ou reabrindo rota para chatId=${chatId}, usuario_id=${sessaoAtual.usuario_id}`);
+  try {
+    await db.query('START TRANSACTION');
+
+    // Verificar pedidos pendentes em entregas
+    const [pedidosPendentes] = await db.query(`
+      SELECT e.id, e.cliente_numero, e.endereco, e.latitude, e.longitude, p.venda_id
+      FROM entregas e
+      JOIN pedidos_diarios p ON e.pedido_id = p.id
+      WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+      ORDER BY e.id
+    `, [sessaoAtual.usuario_id]);
+    console.log(`[DEBUG] Pedidos pendentes encontrados: ${pedidosPendentes.length}`);
+
+    // Verificar rotas abertas em entregador
+    const [rotasAbertas] = await db.query(`
+      SELECT id, quantidade_pedidos FROM entregador WHERE entregador = ? AND hora_fim IS NULL LIMIT 1
+    `, [sessaoAtual.nome || 'Entregador Desconhecido']);
+    console.log(`[DEBUG] Rotas abertas em entregador: ${rotasAbertas.length}`);
+
+    if (pedidosPendentes.length > 0) {
+      // Rota ativa com pedidos pendentes, reabrir
+      sessaoAtual.rotaAtiva = true;
+      sessaoAtual.etapa = 'aguardando_ponto_inicial';
+      sessaoAtual.submenu = 'organizar_rota';
+      sessaoAtual.entregadorRotaId = rotasAbertas.length > 0 ? rotasAbertas[0].id : null;
+      sessaoAtual.pedidoId = null;
+      sessaoAtual.pontoInicial = null;
+      sessaoAtual.locations = pedidosPendentes.map(p => ({
+        id: p.id,
+        address: p.endereco || 'Endereço não especificado',
+        latitude: p.latitude || null,
+        longitude: p.longitude || null
+      }));
+      sessoes.set(chatId, sessaoAtual);
+
+      // Listar pedidos pendentes
+      const lista = pedidosPendentes.map(p => `📦 Entrega #${p.id}\n📞 ${p.cliente_numero}\n📍 ${p.endereco || 'Endereço não especificado'}`).join('\n\n');
+      await enviarMensagem(chatId, `🚚 *Rota ativa com ${pedidosPendentes.length} pedido(s) pendente(s):*\n\n${lista}\n\n📍 *Envie sua localização para recalcular a rota.*`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🚫 Cancelar', callback_data: 'cancelar_rota' }],
+            [{ text: '🛑 Sair', callback_data: 'sair' }]
+          ]
+        }
+      });
+
+      await db.query('COMMIT');
+      return;
+    }
+
+    // Não há pedidos pendentes, fechar rotas antigas e iniciar nova
+    if (rotasAbertas.length > 0) {
+      console.log(`[INFO] Fechando rotas antigas para entregador_id=${sessaoAtual.usuario_id}`);
+      await db.query(`
+        UPDATE entregador
+        SET hora_fim = NOW(), tempo_medio = TIMEDIFF(NOW(), hora_inicio)
+        WHERE id = ?
+      `, [rotasAbertas[0].id]);
+    }
+
+    // Buscar pedidos atribuídos ao entregador com status 'rua'
+    const [pedidos] = await db.query(`
+      SELECT e.id, e.pedido_id
+      FROM entregas e
+      JOIN pedidos_diarios p ON e.pedido_id = p.id
+      WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+    `, [sessaoAtual.usuario_id]);
+    console.log(`[INFO] Pedidos disponíveis para iniciar rota: ${pedidos.length}, IDs: ${pedidos.map(p => p.id).join(', ')}`);
+
+    if (pedidos.length === 0) {
+      await db.query('COMMIT');
+      await enviarMensagem(chatId, '📭 *Nenhum pedido atribuído a você com status "rua" para iniciar uma rota.*', {
+        reply_markup: getSubmenuOrganizarRota()
+      });
+      return;
+    }
+
+    // Obter nome do entregador
+    const [[usuario]] = await db.query('SELECT nome FROM usuarios WHERE id = ?', [sessaoAtual.usuario_id]);
+    const nomeEntregador = usuario?.nome || 'Entregador Desconhecido';
+
+    // Criar registro na tabela entregador
+    const [result] = await db.query(`
+      INSERT INTO entregador (entregador, quantidade_pedidos, hora_inicio, create_at)
+      VALUES (?, ?, NOW(), NOW())
+    `, [nomeEntregador, pedidos.length]);
+    const entregadorRotaId = result.insertId;
+    console.log(`[INFO] Registro criado na tabela entregador: id=${entregadorRotaId}`);
+
+    // Armazenar o ID do registro na sessão
+    sessaoAtual.entregadorRotaId = entregadorRotaId;
+    sessaoAtual.rotaAtiva = true;
+    sessaoAtual.etapa = 'aguardando_ponto_inicial';
+    sessaoAtual.submenu = 'organizar_rota';
+    sessaoAtual.pedidoId = null;
+    sessaoAtual.pontoInicial = null;
+    sessaoAtual.locations = [];
+    sessoes.set(chatId, sessaoAtual);
+
+    // Atualizar as entregas com hora_inicio e data_saida
+    await db.query(`
+      UPDATE entregas e
+      SET e.hora_inicio = CURRENT_TIME(), e.data_saida = NOW()
+      WHERE e.entregador_id = ? AND e.status = 'rua'
+    `, [sessaoAtual.usuario_id]);
+
+    // Atualizar o status dos pedidos na tabela pedidos_diarios
+    await db.query(`
+      UPDATE pedidos_diarios p
+      JOIN entregas e ON p.id = e.pedido_id
+      SET p.status = 'rua'
+      WHERE e.entregador_id = ? AND e.status = 'rua'
+    `, [sessaoAtual.usuario_id]);
+
+    await db.query('COMMIT');
+
+    // Listar pedidos para nova rota
+    const lista = pedidos.map(p => `📦 Entrega #${p.id}`).join('\n\n');
+    await enviarMensagem(chatId, `🚚 *Rota iniciada com ${pedidos.length} pedido(s):*\n\n${lista}\n\n📍 *Envie sua localização para definir o ponto inicial da rota.*`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🚫 Cancelar', callback_data: 'cancelar_rota' }],
+          [{ text: '🛑 Sair', callback_data: 'sair' }]
+        ]
+      }
+    });
+    console.log(`[INFO] Solicitando localização para ponto inicial para chatId=${chatId}`);
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error(`[ERROR] Erro ao iniciar/reabrir rota: ${err.message}`);
+    sessaoAtual.rotaAtiva = false;
+    sessaoAtual.entregadorRotaId = null;
+    sessaoAtual.etapa = 'submenu_organizar_rota';
+    sessaoAtual.submenu = 'organizar_rota';
+    sessoes.set(chatId, sessaoAtual);
+    await enviarMensagem(chatId, `⚠️ *Erro ao iniciar/reabrir a rota: ${err.message}. Tente novamente.*`, {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+  }
+  return;
+}
+
+  // Finalizar Rota
+  if (texto === 'finalizar_rota' || (msg && msg.data === 'finalizar_rota')) {
+    if (!sessaoAtual.rotaAtiva) {
+      await enviarMensagem(chatId, '⚠️ *Nenhuma rota ativa para finalizar.*', {
+        reply_markup: getSubmenuOrganizarRota()
+      });
+      return;
+    }
 
     try {
-      if (data === 'iniciar_rota') {
-        const [rotaAtiva] = await db.query(
-          'SELECT * FROM entregas WHERE entregador_id = ? AND hora_fim IS NULL',
-          [chatId]
-        );
+      await db.query('START TRANSACTION');
 
-        if (rotaAtiva.length > 0) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '⚠️ *Você já possui uma rota ativa. Finalize antes de iniciar outra.*', bot);
-        }
+      // Verificar se há pedidos pendentes
+      const [pedidosPendentes] = await db.query(`
+        SELECT e.id, e.cliente_numero
+        FROM entregas e
+        JOIN pedidos_diarios p ON e.pedido_id = p.id
+        WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+      `, [sessaoAtual.usuario_id]);
+      console.log(`[INFO] Pedidos pendentes ao finalizar rota: ${pedidosPendentes.length}`);
 
-        const [pedidos] = await db.query(
-          'SELECT * FROM entregas WHERE entregador_id IS NULL AND DATE(data_pedido) = CURDATE()'
-        );
-
-        if (!pedidos.length) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '📭 *Nenhum pedido disponível para entrega.*', bot);
-        }
-
-        const idsPedidos = pedidos.map(p => p.pedido_id);
-        const horaInicio = moment().format('YYYY-MM-DD HH:mm:ss');
-        await db.query(
-          `UPDATE entregas SET entregador_id = ?, hora_inicio = ?, status = 'rua' WHERE pedido_id IN (${idsPedidos.map(() => '?').join(',')})`,
-          [chatId, horaInicio, ...idsPedidos]
-        );
-
-        await db.query(
-          `INSERT INTO entregador (entregador, quantidade_pedidos, hora_inicio, create_at) VALUES (?, ?, ?, ?)`,
-          [chatId, idsPedidos.length, horaInicio, horaInicio]
-        );
-
-        sessao.rota = {
-          inicio: new Date(),
-          entregues: [],
-          falhas: [],
-          total: idsPedidos.length,
-          pedidosIds: idsPedidos,
-        };
-        sessao.etapa = 'enviar_localizacao';
-        sessao.lastUpdated = Date.now();
-        sessoes.set(chatId, sessao);
-
-        const keyboard = {
-          keyboard: [[{ text: '📍 Enviar Localização', request_location: true }]],
-          one_time_keyboard: true,
-          resize_keyboard: true,
-        };
-        await bot.answerCallbackQuery(query.id);
-        return bot.sendMessage(chatId, '📍 *Por favor, envie sua localização fixa para calcularmos sua rota!*', {
-          reply_markup: keyboard,
+      if (pedidosPendentes.length > 0) {
+        const listaPendentes = pedidosPendentes.map(p => `📦 Entrega #${p.id} - Cliente: ${p.cliente_numero}`).join('\n');
+        await db.query('COMMIT');
+        await enviarMensagem(chatId, `⚠️ *Existem pedidos pendentes que não foram entregues:*\n\n${listaPendentes}\n\nFinalize ou marque-os como falha antes de encerrar a rota.`, {
+          reply_markup: getSubmenuOrganizarRota()
         });
+        return;
       }
 
-      if (data.startsWith('recebido_')) {
-        const pedidoId = parseInt(data.split('_')[1]);
-        if (isNaN(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '❌ *ID de pedido inválido.*', bot);
-        }
+      // Atualizar entregas para status 'finalizado'
+      await db.query(`
+        UPDATE entregas
+        SET hora_fim = CURRENT_TIME(), status = 'finalizado'
+        WHERE entregador_id = ? AND status = 'rua'
+      `, [sessaoAtual.usuario_id]);
 
-        if (!sessao.rota.pedidosIds.includes(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '❌ *Este pedido não está na sua rota atual.*', bot);
-        }
+      // Atualizar pedidos_diarios
+      await db.query(`
+        UPDATE pedidos_diarios p
+        JOIN entregas e ON p.id = e.pedido_id
+        SET p.status = 'finalizado'
+        WHERE e.entregador_id = ? AND e.status = 'finalizado'
+      `, [sessaoAtual.usuario_id]);
 
-        if (sessao.rota.entregues.includes(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '⚠️ *Este pedido já foi marcado como recebido.*', bot);
-        }
-        if (sessao.rota.falhas.includes(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '⚠️ *Este pedido já foi marcado como falha.*', bot);
-        }
+      // Atualizar registro na tabela entregador
+      await db.query(`
+        UPDATE entregador
+        SET hora_fim = NOW(),
+            tempo_medio = TIMEDIFF(NOW(), hora_inicio)
+        WHERE id = ?
+      `, [sessaoAtual.entregadorRotaId]);
 
-        const [venda] = await db.query(
-          'SELECT forma_pagamento, valor_total FROM vendas WHERE id = ?',
-          [pedidoId]
-        );
+      await db.query('COMMIT');
 
-        if (!venda.length) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '⚠️ *Pedido não encontrado na tabela de vendas.*', bot);
-        }
+      sessaoAtual.rotaAtiva = false;
+      sessaoAtual.entregadorRotaId = null;
+      sessaoAtual.etapa = 'submenu_organizar_rota';
+      sessaoAtual.submenu = 'organizar_rota';
+      sessoes.set(chatId, sessaoAtual);
 
-        const { forma_pagamento, valor_total } = venda[0];
-
-        if (forma_pagamento === 'dinheiro' || forma_pagamento === 'pix e dinheiro') {
-          if (!valor_total) {
-            await bot.answerCallbackQuery(query.id);
-            return enviarMensagem(chatId, '⚠️ *Valor a ser pago não definido. Contate o suporte.*', bot);
-          }
-
-          sessao.subetapa = 'confirmar_valor';
-          sessao.pedidoIdConfirmacao = pedidoId;
-          sessao.valorEsperado = parseFloat(valor_total);
-          sessao.lastUpdated = Date.now();
-          sessoes.set(chatId, sessao);
-
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(
-            chatId,
-            `💵 *Este pedido foi pago em "${forma_pagamento}". O valor a ser recebido é R$${valor_total.toFixed(2)}. Digite o valor que você recebeu para confirmar.*`,
-            bot
-          );
-        }
-
-        await db.query(
-          'UPDATE entregas SET recebido = 1, data_entrega = ? WHERE pedido_id = ?',
-          [moment().format('YYYY-MM-DD HH:mm:ss'), pedidoId]
-        );
-
-        await db.query(
-          'UPDATE vendas SET recebido = 1 WHERE id = ?',
-          [pedidoId]
-        );
-
-        await db.query(
-          'UPDATE pedidos_diarios SET recebido = 1, status = "finalizado" WHERE id = ?',
-          [pedidoId]
-        );
-
-        sessao.rota.entregues.push(pedidoId);
-        sessao.lastUpdated = Date.now();
-        sessoes.set(chatId, sessao);
-
-        const restantes = sessao.rota.total - (sessao.rota.entregues.length + sessao.rota.falhas.length);
-        await bot.answerCallbackQuery(query.id);
-
-        if (restantes > 0) {
-          await enviarMensagem(chatId, `✅ *Pedido ${pedidoId} marcado como recebido. Faltam ${restantes} pedidos.*`, bot);
-          return showRouteMenu(chatId, sessao, bot, db);
-        } else {
-          const keyboard = {
-            inline_keyboard: [[{ text: '🏁 Finalizar Rota', callback_data: 'finalizar_rota' }]],
-          };
-          return enviarMensagem(
-            chatId,
-            '✅ *Todos os pedidos foram processados! Finalize a rota.*',
-            bot,
-            { reply_markup: keyboard }
-          );
-        }
-      }
-
-      if (data.startsWith('falha_')) {
-        const pedidoId = parseInt(data.split('_')[1]);
-        if (isNaN(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '❌ *ID de pedido inválido.*', bot);
-        }
-
-        if (!sessao.rota.pedidosIds.includes(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '❌ *Este pedido não está na sua rota atual.*', bot);
-        }
-
-        if (sessao.rota.entregues.includes(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '⚠️ *Este pedido já foi marcado como recebido.*', bot);
-        }
-        if (sessao.rota.falhas.includes(pedidoId)) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(chatId, '⚠️ *Este pedido já foi marcado como falha.*', bot);
-        }
-
-        await db.query(
-          'UPDATE entregas SET status = "falha", data_entrega = ? WHERE pedido_id = ?',
-          [moment().format('YYYY-MM-DD HH:mm:ss'), pedidoId]
-        );
-
-        await db.query(
-          'UPDATE vendas SET recebido = 1 WHERE id = ?',
-          [pedidoId]
-        );
-
-        await db.query(
-          'UPDATE pedidos_diarios SET status = "falha" WHERE id = ?',
-          [pedidoId]
-        );
-
-        sessao.rota.falhas.push(pedidoId);
-        sessao.rota.pedidosIds = sessao.rota.pedidosIds.filter(id => id !== pedidoId);
-        sessao.lastUpdated = Date.now();
-        sessoes.set(chatId, sessao);
-
-        const restantes = sessao.rota.total - (sessao.rota.entregues.length + sessao.rota.falhas.length);
-        await bot.answerCallbackQuery(query.id);
-
-        if (restantes > 0) {
-          await enviarMensagem(chatId, `❌ *Pedido ${pedidoId} marcado como falha. Faltam ${restantes} pedidos.*`, bot);
-          return showRouteMenu(chatId, sessao, bot, db);
-        } else {
-          const keyboard = {
-            inline_keyboard: [[{ text: '🏁 Finalizar Rota', callback_data: 'finalizar_rota' }]],
-          };
-          return enviarMensagem(
-            chatId,
-            '✅ *Todos os pedidos foram processados! Finalize a rota.*',
-            bot,
-            { reply_markup: keyboard }
-          );
-        }
-      }
-
-      if (data === 'finalizar_rota') {
-        const totalProcessados = sessao.rota.entregues.length + sessao.rota.falhas.length;
-        if (totalProcessados < sessao.rota.total) {
-          await bot.answerCallbackQuery(query.id);
-          return enviarMensagem(
-            chatId,
-            '⚠️ *Ainda há pedidos pendentes. Marque todos como "Recebido" ou "Falha" antes de finalizar.*',
-            bot
-          );
-        }
-
-        const horaFim = moment();
-        const horaInicio = moment(sessao.rota.inicio);
-        const duracaoMinutos = horaFim.diff(horaInicio, 'minutes');
-        const tempoMedio = moment.duration(duracaoMinutos, 'minutes');
-        const tempoMedioPedido = moment.duration(duracaoMinutos / sessao.rota.total, 'minutes');
-
-        const pedidosRestantes = sessao.rota.entregues;
-        if (pedidosRestantes.length > 0) {
-          await db.query(
-            `UPDATE entregas SET hora_fim = ?, status = 'finalizado' WHERE pedido_id IN (${pedidosRestantes.map(() => '?').join(',')})`,
-            [horaFim.format('HH:mm:ss'), ...pedidosRestantes]
-          );
-
-          await db.query(
-            `UPDATE vendas SET recebido = 1 WHERE id IN (${pedidosRestantes.map(() => '?').join(',')})`,
-            [...pedidosRestantes]
-          );
-
-          await db.query(
-            `UPDATE pedidos_diarios SET status = 'finalizado' WHERE id IN (${pedidosRestantes.map(() => '?').join(',')})`,
-            [...pedidosRestantes]
-          );
-        }
-
-        const distanciaTotal = sessao.rota.distanciaTotal || 0;
-        const tempoTotalEstimado = sessao.rota.tempoTotalMinutos || 0;
-        await db.query(
-          `UPDATE entregador SET hora_fim = ?, tempo_medio = ?, tempo_medio_pedido = ?, km = ?, tempo_estimado = ? WHERE entregador = ? AND hora_fim IS NULL`,
-          [
-            horaFim.format('YYYY-MM-DD HH:mm:ss'),
-            moment.utc(tempoMedio.asMilliseconds()).format('HH:mm:ss'),
-            moment.utc(tempoMedioPedido.asMilliseconds()).format('HH:mm:ss'),
-            distanciaTotal.toFixed(2),
-            Math.ceil(tempoTotalEstimado),
-            chatId,
-          ]
-        );
-
-        let resposta = '🏁 *Rota Finalizada*\n\n';
-        resposta += `Pedidos entregues: ${sessao.rota.entregues.length}\n`;
-        resposta += `Pedidos com falha: ${sessao.rota.falhas.length}\n`;
-        resposta += `Distância total: ${distanciaTotal.toFixed(2)} km\n`;
-        resposta += `Tempo total real: ${duracaoMinutos} minutos\n`;
-        resposta += `Tempo estimado: ${Math.ceil(tempoTotalEstimado)} minutos`;
-
-        delete sessao.rota;
-        sessao.subetapa = null;
-        sessao.pedidoIdConfirmacao = null;
-        sessao.valorEsperado = null;
-        sessao.lastUpdated = Date.now();
-        sessoes.set(chatId, sessao);
-
-        await bot.answerCallbackQuery(query.id);
-        await enviarMensagem(chatId, resposta, bot);
-        return showInitialMenu(chatId, sessao.nome, bot);
-      }
-
-      if (data === 'sair') {
-        delete sessao.rota;
-        sessao.subetapa = null;
-        sessao.pedidoIdConfirmacao = null;
-        sessao.valorEsperado = null;
-        sessao.setor = null;
-        sessao.autenticado = false;
-        sessao.lastUpdated = Date.now();
-        sessoes.set(chatId, sessao);
-        await bot.answerCallbackQuery(query.id);
-        return enviarMensagem(
-          chatId,
-          '🛑 *Você saiu do setor Entrega.*\nPara começar, envie *oi* ou sua senha pessoal.',
-          bot
-        );
-      }
-
-      await bot.answerCallbackQuery(query.id);
-      return enviarMensagem(chatId, '⚠️ *Ação inválida. Tente novamente.*', bot);
+      await enviarMensagem(chatId, '✅ *Rota finalizada com sucesso! Todos os pedidos foram processados.*', {
+        reply_markup: getSubmenuOrganizarRota()
+      });
     } catch (err) {
-      console.error(`[ERROR] Erro ao processar callback ${data}:`, err.message);
-      await bot.answerCallbackQuery(query.id);
-      return enviarMensagem(chatId, '⚠️ *Erro ao processar ação. Tente novamente.*', bot);
+      await db.query('ROLLBACK');
+      console.error(`[ERROR] Erro ao finalizar rota: ${err.message}`);
+      await enviarMensagem(chatId, '⚠️ *Erro ao finalizar a rota. Tente novamente.*', {
+        reply_markup: getSubmenuOrganizarRota()
+      });
     }
+    return;
   }
 
-  // Manipular localização
-  if (msg.location && sessao.rota && sessao.etapa === 'enviar_localizacao') {
-    const { latitude, longitude } = msg.location;
-    sessao.rota.localizacaoOrigem = { latitude, longitude };
-    sessao.etapa = null;
-    sessao.lastUpdated = Date.now();
-    sessoes.set(chatId, sessao);
+  // 📋 Lista de pedidos válidos
+  if (texto === 'lista' || (msg && msg.data === 'lista')) {
+    await listarPedidosPendentes(chatId, sessao, db, enviarMensagem);
+    sessaoAtual.etapa = null;
+    sessaoAtual.submenu = 'pedidos';
+    sessoes.set(chatId, sessaoAtual);
+    return;
+  }
 
-    const [pedidos] = await db.query(
-      `SELECT e.*, v.forma_pagamento, v.valor_total, v.valor_dinheiro
-       FROM entregas e
-       LEFT JOIN vendas v ON e.pedido_id = v.id
-       WHERE e.pedido_id IN (${sessao.rota.pedidosIds.map(() => '?').join(',')})`,
-      sessao.rota.pedidosIds
-    );
+  // 📦 Pedidos com botões interativos
+  if (texto === 'pedidos' || (msg && msg.data === 'pedidos')) {
+    try {
+      const [pedidos] = await db.query(`
+        SELECT e.id
+        FROM entregas e
+        JOIN pedidos_diarios p ON e.pedido_id = p.id
+        WHERE p.valido = 1 AND e.status IN ('0', 'rua') AND e.entregador_id = ?
+        ORDER BY e.id
+      `, [sessao.usuario_id]);
+      console.log(`[DEBUG] Pedidos para botões: ${pedidos.length}`);
 
-    if (!pedidos.length) {
-      return enviarMensagem(chatId, '⚠️ *Nenhum pedido encontrado para esta rota.*', bot);
-    }
-
-    const destinos = [];
-    const pedidosComCoordenadas = [];
-    for (const pedido of pedidos) {
-      const enderecoFormatado = `${pedido.endereco}, Cascavel, Paraná, Brasil`;
-      try {
-        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-          params: {
-            address: enderecoFormatado,
-            key: GOOGLE_API_KEY,
-          },
-          timeout: 10000,
-        });
-        if (response.data.status === 'OK' && response.data.results[0]) {
-          const { lat, lng } = response.data.results[0].geometry.location;
-          destinos.push(`${lat},${lng}`);
-          pedidosComCoordenadas.push({
-            pedido,
-            latitude: lat,
-            longitude: lng,
-            enderecoFormatado,
-          });
-        } else {
-          console.warn(`[DEBUG] Endereço não encontrado para pedido ${pedido.pedido_id}: ${enderecoFormatado}`);
-          pedidosComCoordenadas.push({
-            pedido,
-            latitude: null,
-            longitude: null,
-            enderecoFormatado,
-          });
-        }
-      } catch (error) {
-        console.error(`[ERROR] Erro ao obter coordenadas para pedido ${pedido.pedido_id}:`, error.message);
-        pedidosComCoordenadas.push({
-          pedido,
-          latitude: null,
-          longitude: null,
-          enderecoFormatado,
-        });
-      }
-    }
-
-    const origem = [`${latitude},${longitude}`];
-    const resultadosDistancia = await calculateDistance(origem, destinos, bot, chatId);
-
-    const pedidosComDetalhes = pedidosComCoordenadas.map((item, index) => {
-      const resultado = resultadosDistancia[index] || { distance: 'N/A', duration: 'N/A' };
-      return {
-        ...item,
-        distance: resultado.distance,
-        duration: resultado.duration,
-      };
-    });
-
-    const unvisited = pedidosComDetalhes.filter(p => p.latitude && p.longitude);
-    const optimizedRoute = [];
-    let currentLocation = { latitude, longitude };
-
-    while (unvisited.length > 0) {
-      let nearest = null;
-      let nearestDistance = Infinity;
-      let nearestIndex = -1;
-
-      for (let i = 0; i < unvisited.length; i++) {
-        const loc = unvisited[i];
-        const distanciaMetros = loc.distance === 'N/A' ? Infinity : parseFloat(loc.distance.replace(/,/g, '').replace(' km', '')) * 1000;
-        if (distanciaMetros < nearestDistance) {
-          nearest = loc;
-          nearestDistance = distanciaMetros;
-          nearestIndex = i;
-        }
-      }
-
-      if (nearest) {
-        optimizedRoute.push(nearest);
-        currentLocation = { latitude: nearest.latitude, longitude: nearest.longitude };
-        unvisited.splice(nearestIndex, 1);
-      } else {
-        break;
-      }
-    }
-
-    const pedidosSemCoordenadas = pedidosComDetalhes.filter(p => !p.latitude || !p.longitude);
-    optimizedRoute.push(...pedidosSemCoordenadas);
-
-    let resposta = '🚚 *Rota Otimizada*\n\n';
-    let distanciaTotal = 0;
-    let tempoTotalMinutos = 0;
-
-    optimizedRoute.forEach((item, index) => {
-      const pedido = item.pedido;
-      const distancia = item.distance === 'N/A' ? 'Indisponível' : item.distance;
-      const tempo = item.duration === 'N/A' ? 'Indisponível' : item.duration;
-      if (item.distance !== 'N/A') {
-        distanciaTotal += parseFloat(item.distance.replace(/,/g, '').replace(' km', '')) || 0;
-      }
-      if (item.duration !== 'N/A') {
-        const tempoMinutos = parseFloat(item.duration.replace(' min', '')) || 0;
-        tempoTotalMinutos += tempoMinutos;
-      }
-      const enderecoCodificado = encodeURIComponent(item.enderecoFormatado);
-      const linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${enderecoCodificado}`;
-      resposta += `*${index + 1}. Pedido ${pedido.pedido_id}*\n`;
-      resposta += `Cliente: ${pedido.cliente_numero}\n`;
-      resposta += `Endereço: [${pedido.endereco}](${linkGoogleMaps})\n`;
-      resposta += `Distância: ${distancia}\n`;
-      resposta += `Tempo estimado: ${tempo}\n`;
-      if (pedido.forma_pagamento) {
-        resposta += `Forma de Pagamento: ${pedido.forma_pagamento}`;
-        if (pedido.forma_pagamento === 'dinheiro' || pedido.forma_pagamento === 'pix e dinheiro') {
-          const valorPago = pedido.valor_total ? parseFloat(pedido.valor_total).toFixed(2) : 'N/A';
-          resposta += ` - Valor: R$${valorPago}`;
-          if (pedido.forma_pagamento === 'pix e dinheiro' && pedido.valor_dinheiro) {
-            resposta += ` (Dinheiro: R$${parseFloat(pedido.valor_dinheiro).toFixed(2)})`;
+      if (pedidos.length === 0) {
+        await enviarMensagem(chatId, '📭 *Nenhum pedido atribuído a você.*', {
+          reply_markup: {
+            inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'submenu_pedidos' }, { text: '🛑 Sair', callback_data: 'sair' }]]
           }
-        }
-        resposta += '\n';
+        });
+        return;
       }
-      resposta += '\n';
+
+      const buttons = pedidos.map(p => [{ text: `Pedido #${p.id}`, callback_data: `pedido_${p.id}` }]);
+      await enviarMensagem(chatId, '🔍 *Selecione um pedido para ver os detalhes:*', {
+        reply_markup: {
+          inline_keyboard: buttons.concat([[{ text: '⬅️ Voltar', callback_data: 'submenu_pedidos' }, { text: '🛑 Sair', callback_data: 'sair' }]])
+        }
+      });
+      sessaoAtual.etapa = null;
+      sessoes.set(chatId, sessaoAtual);
+    } catch (err) {
+      console.error(`[ERROR] Erro ao carregar pedidos: ${err.message}`);
+      await enviarMensagem(chatId, '⚠️ *Erro ao carregar pedidos.*', {
+        reply_markup: getSubmenuPedidos()
+      });
+    }
+    return;
+  }
+
+  // 💰 Valores a Receber
+  if (texto === 'valores_receber' || (msg && msg.data === 'valores_receber')) {
+    try {
+      const [vendas] = await db.query(`
+        SELECT e.id, v.valor_total, v.forma_pagamento, v.valor_dinheiro
+        FROM entregas e
+        JOIN pedidos_diarios p ON e.pedido_id = p.id
+        JOIN vendas v ON p.venda_id = v.id
+        WHERE p.valido = 1 
+          AND e.status IN ('0', 'rua')
+          AND e.entregador_id = ?
+          AND (v.forma_pagamento = 'dinheiro' OR v.forma_pagamento = 'pix+dinheiro')
+      `, [sessao.usuario_id]);
+      console.log(`[DEBUG] Vendas encontradas: ${vendas.length}`);
+
+      if (vendas.length === 0) {
+        await enviarMensagem(chatId, '📭 *Nenhuma venda pendente em dinheiro ou pix+dinheiro atribuída a você.*', {
+          reply_markup: {
+            inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]]
+          }
+        });
+        return;
+      }
+
+      const lista = vendas.map(v => {
+        const valor = v.forma_pagamento === 'pix+dinheiro' && v.valor_dinheiro ? v.valor_dinheiro : v.valor_total;
+        return `📜 Entrega #${v.id}: R$ ${valor} (${v.forma_pagamento})`;
+      }).join('\n');
+      const total = vendas.reduce((sum, venda) => {
+        const valor = venda.forma_pagamento === 'pix+dinheiro' && venda.valor_dinheiro ? venda.valor_dinheiro : venda.valor_total;
+        return sum + (valor || 0);
+      }, 0);
+      await enviarMensagem(chatId, `💵 *Valores a Receber (Dinheiro/Pix+Dinheiro):*\n\n${lista}\n\n*Total*: R$ ${total}`, {
+        reply_markup: {
+          inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]]
+        }
+      });
+    } catch (err) {
+      console.error(`[ERROR] Erro ao calcular valores: ${err.message}`);
+      await enviarMensagem(chatId, '⚠️ *Erro ao calcular valores a receber.*', {
+        reply_markup: {
+          inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]]
+        }
+      });
+    }
+    return;
+  }
+
+  // Captura justificativa de falha
+  if (sessaoAtual.etapa === 'falha_justificativa') {
+    if (msg && msg.data && msg.data.startsWith('justificativa_')) {
+      const justificativa = msg.data.replace('justificativa_', '');
+      const entregaId = sessaoAtual.pedidoId;
+      try {
+        await db.query('START TRANSACTION');
+
+        await db.query('UPDATE entregas SET status = ?, observacoes = ? WHERE id = ?', ['falha', justificativa, entregaId]);
+        await db.query('UPDATE pedidos_diarios SET status = "falha" WHERE id = (SELECT pedido_id FROM entregas WHERE id = ?)', [entregaId]);
+
+        await db.query('COMMIT');
+
+        console.log(`[DEBUG] Entrega #${entregaId} marcada com falha`);
+        await enviarMensagem(chatId, `❌ *Entrega #${entregaId} marcada como falha com justificativa: ${justificativa}*`, {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔍 Ver Detalhes de Outro Pedido', callback_data: 'pedidos' }],
+              [{ text: '⬅️ Voltar', callback_data: 'submenu_pedidos' }, { text: '🛑 Sair', callback_data: 'sair' }]
+            ]
+          }
+        });
+        await listarPedidosPendentes(chatId, sessao, db, enviarMensagem);
+
+        // Verificar se a rota deve ser finalizada automaticamente
+        await verificarFinalizarRotaAutomaticamente(chatId, sessao, db, enviarMensagem);
+
+        sessaoAtual.etapa = null;
+        sessaoAtual.submenu = 'pedidos';
+        sessaoAtual.pedidoId = null;
+        sessaoAtual.pontoInicial = null;
+        sessaoAtual.locations = [];
+        sessaoAtual.justificativaSelecionada = null;
+        sessoes.set(chatId, sessaoAtual);
+      } catch (err) {
+        await db.query('ROLLBACK');
+        console.error(`[ERROR] Erro ao salvar justificativa: ${err.message}`);
+        await enviarMensagem(chatId, '⚠️ *Erro ao salvar justificativa.*', {
+          reply_markup: {
+            inline_keyboard: [[{ text: '🚫 Cancelar', callback_data: 'cancelar_justificativa' }, { text: '🛑 Sair', callback_data: 'sair' }]]
+          }
+        });
+      }
+      bot.answerCallbackQuery(msg.id, { cache_time: 1 });
+      return;
+    }
+  }
+
+  // Delegar para organizar rota
+  const handledByOrganizarRota = await tratarOrganizarRota(texto, msg, sessao, db, bot, chatId, sessoes, enviarMensagem);
+  if (handledByOrganizarRota) {
+    console.log(`[DEBUG] Ação tratada por organizar_rota, pulando menu padrão para chatId=${chatId}`);
+    return;
+  }
+
+  // Caso padrão: exibe o menu principal apenas se necessário
+  if (sessaoAtual.etapa === 'detalhes_pedido' && sessaoAtual.pedidoId) {
+    // Não faz nada, deixa o controle com configurarEntrega
+    return;
+  }
+  if (sessaoAtual.etapa === 'submenu_pedidos' || sessaoAtual.submenu === 'pedidos') {
+    await enviarMensagem(chatId, '📦 *Menu de Pedidos:* Escolha uma opção:', {
+      reply_markup: getSubmenuPedidos()
     });
-
-    resposta += `*Total*\n`;
-    resposta += `Distância total: ${distanciaTotal.toFixed(2)} km\n`;
-    resposta += `Tempo total estimado: ${Math.ceil(tempoTotalMinutos)} minutos`;
-
-    sessao.rota.distanciaTotal = distanciaTotal;
-    sessao.rota.tempoTotalMinutos = tempoTotalMinutos;
-    sessao.optimizedRoute = optimizedRoute;
-    sessao.lastUpdated = Date.now();
-    sessoes.set(chatId, sessao);
-
-    await enviarMensagem(chatId, resposta, bot);
-    return showRouteMenu(chatId, sessao, bot, db);
+    return;
   }
-
-  // Confirmação de valor
-  if (sessao.subetapa === 'confirmar_valor' && sessao.rota) {
-    const pedidoId = sessao.pedidoIdConfirmacao;
-    const valorEsperado = sessao.valorEsperado;
-
-    const valorInformado = parseFloat(texto);
-    if (isNaN(valorInformado)) {
-      return enviarMensagem(chatId, '❌ *Por favor, informe um valor numérico válido. Exemplo: 50.00*', bot);
-    }
-
-    if (valorInformado !== valorEsperado) {
-      return enviarMensagem(
-        chatId,
-        `❌ *O valor informado (${valorInformado.toFixed(2)}) não corresponde ao valor esperado (${valorEsperado.toFixed(2)}). Tente novamente.*`,
-        bot
-      );
-    }
-
-    await db.query(
-      'UPDATE entregas SET recebido = 1, data_entrega = ? WHERE pedido_id = ?',
-      [moment().format('YYYY-MM-DD HH:mm:ss'), pedidoId]
-    );
-
-    await db.query(
-      'UPDATE vendas SET recebido = 1 WHERE id = ?',
-      [pedidoId]
-    );
-
-    await db.query(
-      'UPDATE pedidos_diarios SET recebido = 1, status = "finalizado" WHERE id = ?',
-      [pedidoId]
-    );
-
-    sessao.rota.entregues.push(pedidoId);
-    sessao.subetapa = null;
-    sessao.pedidoIdConfirmacao = null;
-    sessao.valorEsperado = null;
-    sessao.lastUpdated = Date.now();
-    sessoes.set(chatId, sessao);
-
-    const restantes = sessao.rota.total - (sessao.rota.entregues.length + sessao.rota.falhas.length);
-    if (restantes > 0) {
-      await enviarMensagem(chatId, `✅ *Pedido ${pedidoId} marcado como recebido. Faltam ${restantes} pedidos.*`, bot);
-      return showRouteMenu(chatId, sessao, bot, db);
-    } else {
-      const keyboard = {
-        inline_keyboard: [[{ text: '🏁 Finalizar Rota', callback_data: 'finalizar_rota' }]],
-      };
-      return enviarMensagem(
-        chatId,
-        '✅ *Todos os pedidos foram processados! Finalize a rota.*',
-        bot,
-        { reply_markup: keyboard }
-      );
-    }
+  if (sessaoAtual.etapa === 'submenu_organizar_rota' || sessaoAtual.submenu === 'organizar_rota') {
+    await enviarMensagem(chatId, '🗺️ *Menu de Rota:* Escolha uma opção:', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+    return;
   }
+  // Evita menu se já tratou etapas como detalhes
+if (!sessaoAtual.etapa || sessaoAtual.etapa === 'menu') {
+  await enviarMensagem(chatId, '🚚 *Bem-vindo ao painel do entregador!* Escolha uma opção:', {
+    reply_markup: getMenuPrincipal()
+  });
+}
+  sessaoAtual.etapa = 'menu';
+  sessaoAtual.submenu = null;
+  sessaoAtual.pedidoId = null;
+  sessaoAtual.pontoInicial = null;
+  sessaoAtual.locations = [];
+  sessaoAtual.justificativaSelecionada = null;
+  sessoes.set(chatId, sessaoAtual);
+  console.log(`[DEBUG] Menu padrão exibido para chatId=${chatId}`);
+  return;
 
-  // Exibir menu inicial por padrão
-  return showInitialMenu(chatId, sessao.nome, bot);
-};
+}
 
-// Exibir menu da rota com botões para cada pedido
-const showRouteMenu = async (chatId, sessao, bot, db) => {
-  if (!sessao.rota || !sessao.optimizedRoute) {
-    return enviarMensagem(chatId, '⚠️ *Nenhuma rota ativa. Inicie uma nova rota.*', bot);
-  }
+async function verificarFinalizarRotaAutomaticamente(chatId, sessao, db, enviarMensagem) {
+  try {
+    const [pedidosPendentes] = await db.query(`
+      SELECT e.id, e.cliente_numero
+      FROM entregas e
+      JOIN pedidos_diarios p ON e.pedido_id = p.id
+      WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+    `, [sessao.usuario_id]);
 
-  const optimizedRoute = sessao.optimizedRoute;
-  let resposta = '🚚 *Gerenciar Rota*\n\n';
-  const keyboard = { inline_keyboard: [] };
+    if (pedidosPendentes.length === 0 && sessao.rotaAtiva) {
+      console.log(`[DEBUG] Todos os pedidos finalizados, finalizando rota automaticamente para chatId=${chatId}`);
+      await db.query('START TRANSACTION');
 
-  optimizedRoute.forEach((item, index) => {
-    const pedido = item.pedido;
-    if (!sessao.rota.entregues.includes(pedido.pedido_id) && !sessao.rota.falhas.includes(pedido.pedido_id)) {
-      resposta += `*${index + 1}. Pedido ${pedido.pedido_id}*\n`;
-      resposta += `Endereço: ${pedido.endereco}\n\n`;
-      keyboard.inline_keyboard.push([
-        { text: `✅ Recebido ${pedido.pedido_id}`, callback_data: `recebido_${pedido.pedido_id}` },
-        { text: `❌ Falha ${pedido.pedido_id}`, callback_data: `falha_${pedido.pedido_id}` },
-      ]);
+      // Atualizar registro na tabela entregador
+      await db.query(`
+        UPDATE entregador
+        SET hora_fim = NOW(),
+            tempo_medio = TIMEDIFF(NOW(), hora_inicio)
+        WHERE id = ?
+      `, [sessao.entregadorRotaId]);
+
+      await db.query('COMMIT');
+
+      sessao.rotaAtiva = false;
+      sessao.entregadorRotaId = null;
+      sessao.etapa = 'submenu_organizar_rota';
+      sessao.submenu = 'organizar_rota';
+      sessoes.set(chatId, sessao);
+
+      await enviarMensagem(chatId, '✅ *Rota finalizada automaticamente! Todos os pedidos foram processados.*', {
+        reply_markup: getSubmenuOrganizarRota()
+      });
+    } else if (pedidosPendentes.length > 0) {
+      const listaPendentes = pedidosPendentes.map(p => `📦 Entrega #${p.id} - Cliente: ${p.cliente_numero}`).join('\n');
+      await enviarMensagem(chatId, `⚠️ *Pedidos pendentes encontrados:*\n\n${listaPendentes}\n\nFinalize ou marque-os como falha para encerrar a rota.`, {
+        reply_markup: getSubmenuOrganizarRota()
+      });
     }
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error(`[ERROR] Erro ao verificar finalização automática da rota: ${err.message}`);
+    await enviarMensagem(chatId, '⚠️ *Erro ao verificar status da rota.*', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+  }
+}
+
+function configurarEntrega(bot, db, sessoes) {
+  // Configurar listener para callback queries
+  bot.on('callback_query', async (query) => {
+    const chatId = query.message.chat.id.toString();
+    const data = query.data;
+    console.log(`[DEBUG] Callback recebido: chatId=${chatId}, data=${data}`);
+
+    const sessao = sessoes.get(chatId) || { etapa: 'menu', locations: [], pontoInicial: null, pedidoId: null, submenu: null, rotaAtiva: false };
+
+    // Delegar para callbacks de organizar rota
+    const enviarMensagemWrapper = async (chatId, message, options) => {
+      if (!bot) {
+        console.error('[ERROR] Instância do bot está undefined');
+        throw new Error('Instância do bot não inicializada');
+      }
+      return bot.sendMessage(chatId, message, options);
+    };
+
+const handledByOrganizarRota = await tratarCallbackOrganizarRota(query, sessao, db, bot, chatId, sessoes, enviarMensagemWrapper);
+    if (handledByOrganizarRota) {
+      console.log(`[DEBUG] Callback tratado por organizar_rota: ${data}`);
+      return;
+    }
+
+    if (data.startsWith('pedido_')) {
+      await bot.answerCallbackQuery(query.id, { cache_time: 1 });
+      const entregaId = parseInt(data.split('_')[1]);
+      try {
+        const [[entrega]] = await db.query(`
+          SELECT e.id, e.cliente_numero, v.forma_pagamento, v.valor_total, e.status,
+                GROUP_CONCAT(i.produto_id SEPARATOR ', ') AS itens, e.endereco
+          FROM entregas e
+          JOIN pedidos_diarios p ON e.pedido_id = p.id
+          JOIN vendas v ON p.venda_id = v.id
+          JOIN pedido_itens i ON p.id = i.pedido_id
+          WHERE e.id = ? AND e.entregador_id = ?
+          GROUP BY e.id, v.forma_pagamento, v.valor_total, e.status, e.endereco
+        `, [entregaId, sessao.usuario_id]);
+        console.log(`[DEBUG] Entrega #${entregaId} encontrada`);
+
+        if (!entrega) {
+          await bot.sendMessage(chatId, '❌ *Entrega não encontrada ou não atribuída a você.*', {
+            reply_markup: {
+              inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'submenu_pedidos' }, { text: '🛑 Sair', callback_data: 'sair' }]]
+            }
+          });
+          return;
+        }
+
+        let texto = `📦 *Entrega #${entrega.id}*
+      📞 ${entrega.cliente_numero}
+      🛒 Itens: Produto(s) #${entrega.itens}
+      📍 Endereço: ${entrega.endereco || 'Não especificado'}
+      💳 Pagamento: ${entrega.forma_pagamento}`;
+
+        const botoes = [
+          [{ text: '📲 Chamar no WhatsApp', url: `https://wa.me/55${entrega.cliente_numero}` }],
+        ];
+
+        if ((entrega.forma_pagamento === 'dinheiro' || entrega.forma_pagamento === 'pix+dinheiro') && entrega.status === 'rua') {
+          botoes.push([
+            { text: '✅ Recebido', callback_data: `recebido_${entrega.id}` },
+            { text: '❌ Falha', callback_data: `falha_${entrega.id}` }
+          ]);
+        }
+
+        botoes.push([
+          { text: '⬅️ Voltar', callback_data: 'submenu_pedidos' },
+          { text: '🛑 Sair', callback_data: 'sair' }
+        ]);
+
+        await bot.sendMessage(chatId, texto, {
+          reply_markup: { inline_keyboard: botoes }
+        });
+        sessao.etapa = 'detalhes_pedido';
+        sessao.pedidoId = entregaId; // Manter o ID do pedido atual
+        sessao.submenu = 'pedidos'; // Manter o submenu como referência
+        sessoes.set(chatId, sessao);
+      } catch (err) {
+        console.error(`[ERROR] Erro ao buscar detalhes da entrega: ${err.message}`);
+        await bot.sendMessage(chatId, '⚠️ *Erro ao buscar detalhes da entrega.*', {
+          reply_markup: getSubmenuPedidos()
+        });
+      }
+      return;
+    }
+
+    if (data.startsWith('recebido_')) {
+      await bot.answerCallbackQuery(query.id, { cache_time: 1 }); // Adiciona cache_time para evitar duplicação
+      const entregaId = parseInt(data.split('_')[1]);
+      try {
+        await db.query('START TRANSACTION');
+
+        await db.query('UPDATE entregas SET status = ?, data_entrega = NOW(), recebido = 1 WHERE id = ?', ['finalizado', entregaId]);
+        await db.query('UPDATE pedidos_diarios SET status = "finalizado", recebido = 1 WHERE id = (SELECT pedido_id FROM entregas WHERE id = ?)', [entregaId]);
+        await db.query('UPDATE vendas SET recebido = 1 WHERE id = (SELECT venda_id FROM pedidos_diarios WHERE id = (SELECT pedido_id FROM entregas WHERE id = ?))', [entregaId]);
+
+        await db.query('COMMIT');
+
+        console.log(`[DEBUG] Entrega #${entregaId} marcada como recebida`);
+        await bot.sendMessage(chatId, `✅ *Entrega #${entregaId} marcada como recebida.*`, {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔍 Ver Detalhes de Outro Pedido', callback_data: 'pedidos' }],
+              [{ text: '⬅️ Voltar', callback_data: 'submenu_pedidos' }, { text: '🛑 Sair', callback_data: 'sair' }]
+            ]
+          }
+        });
+        await listarPedidosPendentes(chatId, sessao, db, bot.sendMessage);
+
+        // Verificar se a rota deve ser finalizada automaticamente
+        await verificarFinalizarRotaAutomaticamente(chatId, sessao, db, bot.sendMessage);
+
+        sessao.etapa = null;
+        sessao.submenu = 'pedidos';
+        sessao.pedidoId = null;
+        sessao.pontoInicial = null;
+        sessao.locations = [];
+        sessao.justificativaSelecionada = null;
+        sessoes.set(chatId, sessao);
+      } catch (err) {
+        await db.query('ROLLBACK');
+        console.error(`[ERROR] Erro ao atualizar status da entrega: ${err.message}`);
+        await bot.sendMessage(chatId, '⚠️ *Erro ao atualizar status da entrega.*', {
+          reply_markup: getSubmenuPedidos()
+        });
+      }
+      return;
+    }
+
+    if (data.startsWith('falha_')) {
+      await bot.answerCallbackQuery(query.id);
+      const entregaId = parseInt(data.split('_')[1]);
+      sessao.etapa = 'falha_justificativa';
+      sessao.pedidoId = entregaId;
+      sessao.pontoInicial = null;
+      sessao.locations = [];
+      sessao.justificativaSelecionada = null;
+      sessao.submenu = 'pedidos';
+      sessoes.set(chatId, sessao);
+      console.log(`[DEBUG] Aguardando justificativa para falha da entrega #${entregaId}`);
+      await bot.sendMessage(chatId, '❗ *Selecione o motivo da falha no recebimento:*', {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: 'Cliente Ausente', callback_data: `justificativa_Cliente Ausente` }],
+            [{ text: 'Endereço Incorreto', callback_data: `justificativa_Endereço Incorreto` }],
+            [{ text: 'Recusado pelo Cliente', callback_data: `justificativa_Recusado pelo Cliente` }],
+            [{ text: 'Outro', callback_data: `justificativa_Outro` }],
+            [{ text: '🚫 Cancelar', callback_data: 'cancelar_justificativa' }, { text: '🛑 Sair', callback_data: 'sair' }]
+          ]
+        }
+      });
+      return;
+    }
+
+    if (data === 'cancelar_justificativa') {
+      await bot.answerCallbackQuery(query.id);
+      sessao.etapa = null;
+      sessao.submenu = 'pedidos';
+      sessao.pedidoId = null;
+      sessao.pontoInicial = null;
+      sessao.locations = [];
+      sessao.justificativaSelecionada = null;
+      sessoes.set(chatId, sessao);
+      await listarPedidosPendentes(chatId, sessao, db, bot.sendMessage);
+      return;
+    }
+
+    // Delegar para organizar rota (já tratado acima por tratarCallbackOrganizarRota)
   });
 
-  const restantes = sessao.rota.total - (sessao.rota.entregues.length + sessao.rota.falhas.length);
-  resposta += `*Pedidos restantes:* ${restantes}\n`;
-  resposta += `*Entregues:* ${sessao.rota.entregues.length}\n`;
-  resposta += `*Falhas:* ${sessao.rota.falhas.length}`;
+  // Configurar listener de organizar rota
+  configurarOrganizarRota(bot, db, sessoes);
+}
 
-  if (restantes === 0) {
-    keyboard.inline_keyboard.push([{ text: '🏁 Finalizar Rota', callback_data: 'finalizar_rota' }]);
-  }
-  keyboard.inline_keyboard.push([{ text: '🛑 Sair', callback_data: 'sair' }]);
-
-  return enviarMensagem(chatId, resposta, bot, { reply_markup: keyboard });
-};
+module.exports = { tratarEntrega, configurarEntrega };

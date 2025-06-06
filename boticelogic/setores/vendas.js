@@ -118,7 +118,6 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     if (data === 'cancelar') {
       sessao.carrinho = [];
       sessao.etapa = null;
-      sessao.endereco = null;
       sessao.metodo_pagamento = null;
       sessao.comprovante_pagamento = null;
       sessao.numero_cliente = null;
@@ -214,13 +213,12 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     
         // Save sale in vendas table
         const [result] = await connection.query(
-          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total, endereco, valor_dinheiro, recebido, status, data, vendedor_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total valor_dinheiro, recebido, status, data, vendedor_id)
+           VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)`,
           [
             sessao.numero_cliente || 'Não informado',
             sessao.metodo_pagamento || 'Não informado',
             valorTotal || 0,
-            sessao.endereco || 'Não informado',
             sessao.metodo_pagamento === 'dinheiro_pix' ? sessao.valor_dinheiro || 0 : null,
             0,
             'novo',
@@ -232,12 +230,11 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     
         // Save order in pedidos_diarios table
         const [pedidoResult] = await connection.query(
-          `INSERT INTO pedidos_diarios (cliente_numero, status, endereco, recebido, venda_id)
-           VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO pedidos_diarios (cliente_numero, status, recebido, venda_id)
+           VALUES (?, ?, ?, ?)`,
           [
             sessao.numero_cliente || 'Não informado',
             'novo',
-            sessao.endereco || 'Não informado',
             0,
             vendaId,
           ]
@@ -288,7 +285,6 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         // Clear session
         sessao.carrinho = [];
         sessao.etapa = null;
-        sessao.endereco = null;
         sessao.metodo_pagamento = null;
         sessao.comprovante_pagamento = null;
         sessao.numero_cliente = null;
@@ -409,7 +405,6 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
   if (sessao.etapa && Date.now() - sessao.lastUpdated > 5 * 60 * 1000) {
     sessao.carrinho = [];
     sessao.etapa = null;
-    sessao.endereco = null;
     sessao.metodo_pagamento = null;
     sessao.comprovante_pagamento = null;
     sessao.numero_cliente = null;
@@ -583,16 +578,6 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
   }
 
   if (sessao.etapa === 'finalizar') {
-    if (msg.location) {
-      sessao.endereco = `Localização: ${msg.location.latitude}, ${msg.location.longitude}`;
-    } else {
-      if (!texto.trim()) {
-        await sendMessage(chatId, `⚠️ *Por favor, envie um endereço válido ou uma localização.*`, bot);
-        sessao.lastUpdated = Date.now();
-        return;
-      }
-      sessao.endereco = escapeMarkdown(texto);
-    }
     sessao.etapa = 'metodo_pagamento';
     sessao.lastUpdated = Date.now();
     const keyboard = {
@@ -724,7 +709,6 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
     });
     const valorTotalFormatado = isNaN(valorTotal) ? 'Indisponível' : `R$${valorTotal.toFixed(2)}`;
     mensagem += `\n*Valor total:* ${valorTotalFormatado}\n`;
-    mensagem += `*Endereço:* ${escapeMarkdown(sessao.endereco || 'Não informado')}\n`;
     mensagem += `*Pagamento:* ${escapeMarkdown(sessao.metodo_pagamento || 'Não informado')}\n`;
     if (sessao.metodo_pagamento === 'dinheiro_pix' && sessao.valor_dinheiro !== undefined) {
       mensagem += `*Valor em dinheiro:* R$${sessao.valor_dinheiro.toFixed(2)}\n`;

@@ -9,286 +9,373 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
-  <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
 </head>
+
 <body>
-  <div id="app">
-    <div id="notification-container" class="notification-container"></div>
-    <nav id="navbar-main" class="navbar is-fixed-top">
-      <div class="navbar-brand">
-        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
-          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+  <script>
+    function mostrarNotificacao(mensagem, tipo = 'is-info', tempo = 4000) {
+  const notif = document.getElementById('notificacao');
+  if (!notif) return;
+
+  notif.className = `notification ${tipo}`;
+  notif.innerHTML = `
+    <button class="delete" onclick="this.parentElement.classList.add('is-hidden')"></button>
+    ${mensagem}
+  `;
+  notif.classList.remove('is-hidden');
+
+  // Oculta após o tempo
+  setTimeout(() => {
+    notif.classList.add('is-hidden');
+  }, tempo);
+}
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const usuario = localStorage.getItem('usuario');
+      const permissao = localStorage.getItem('permissao');
+  
+      // Verifica se o usuário e permissão estão armazenados no localStorage
+      if (!usuario || !permissao) {
+        mostrarNotificacao('Você não está autenticado! Redirecionando para o login...', 'is-danger');
+        window.location.href = '../login.html'; // Redireciona para a página de login
+      }
+  
+      // Verificação adicional para garantir que o usuário tem a permissão certa para acessar a página
+      if (permissao !== 'vendas') {
+        mostrarNotificacao('Você não tem permissão para acessar essa área!', 'is-danger');
+        window.location.href = '../login.html'; // Redireciona para o login se não tiver permissão
+      }
+    });
+  </script>
+<div id="app">
+  <nav id="navbar-main" class="navbar is-fixed-top">
+    <div class="navbar-brand">
+      <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+        <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+      </a>
+    </div>
+    <div class="navbar-brand is-right">
+      <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+        <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+      </a>
+    </div>
+    <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+      <div class="navbar-end">
+        <a title="Log out" class="navbar-item is-desktop-icon-only">
+          <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
         </a>
       </div>
-      <div class="navbar-brand is-right">
-        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
-          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
-        </a>
+    </div>
+  </nav>
+  <aside class="aside is-placed-left is-expanded">
+    <div class="aside-tools">
+      <div class="aside-tools-label">
+        <span><b>Admin</b></span>
       </div>
-      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
-        <div class="navbar-end">
-          <a title="Log out" class="navbar-item is-desktop-icon-only">
-            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
-          </a>
+    </div>
+    <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+        <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+    </div>
+  </aside>
+  <section class="section is-title-bar">
+    <div class="level">
+      <div class="level-left">
+        <div class="level-item">
+          <ul><li>Admin</li><li>Estoque</li></ul>
         </div>
       </div>
-    </nav>
-    <aside class="aside is-placed-left is-expanded">
-      <div class="aside-tools">
-        <div class="aside-tools-label">
-          <span><b>Gerente de Vendas</b></span>
-        </div>
-      </div>
-      <div class="menu is-menu-main">
-        <p class="menu-label">Geral</p>
-        <ul class="menu-list">
-          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-          <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
-          <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-        </ul>
-      </div>
-    </aside>
-    <section class="section is-title-bar">
+    </div>
+  </section>
+  <section class="hero is-hero-bar">
+    <div class="hero-body">
       <div class="level">
         <div class="level-left">
-          <div class="level-item">
-            <ul><li>Gerente de Vendas</li><li>Estoque</li></ul>
+          <div class="level-item"><h1 class="title">Estoque</h1></div>
+        </div>
+        <div class="level-right">
+          <div class="level-item"><button id="addEstoqueBtn" class="button is-link mr-2">Adicionar Estoque</button>
+          <button id="baixarEstoqueBtn" class="button is-danger mr-2">Baixar Estoque</button>
+            <button id="refreshEstoqueBtn" class="button is-primary">Atualizar</button>
           </div>
         </div>
       </div>
-    </section>
-    <section class="hero is-hero-bar">
-      <div class="hero-body">
-        <div class="level">
-          <div class="level-left">
-            <div class="level-item"><h1 class="title">Estoque</h1></div>
-          </div>
-          <div class="level-right">
-            <div class="level-item">
-              <button id="refreshEstoqueBtn" class="button is-primary">Atualizar</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-    <section class="section is-main-section">
-      <div class="card mb-6">
-        <header class="card-header">
-          <p class="card-header-title">
-            <span class="icon"><i class="mdi mdi-warehouse"></i></span>
-            Gerenciamento de Estoque
-          </p>
-        </header>
-        <div class="card-content">
-          <div class="field is-horizontal is-spaced mb-4">
-            <div class="field-label is-normal">
-              <label class="label">Filtro</label>
-            </div>
+    </div>
+  </section>
+  <section class="section is-main-section">
+    <div class="card mb-6">
+      <header class="card-header">
+        <p class="card-header-title"><span class="icon"><i class="mdi mdi-warehouse"></i></span>Inventário</p>
+      </header>
+      <div class="card-content">
+        <form id="filterEstoqueForm">
+          <div class="field is-horizontal is-spaced">
+            <div class="field-label is-normal"><label class="label">Filtros</label></div>
             <div class="field-body">
               <div class="field mr-4">
                 <p class="control is-expanded has-icons-left">
-                  <input class="input" type="text" id="buscaProduto" placeholder="Nome do Produto">
-                  <span class="icon is-small is-left"><i class="mdi mdi-magnify"></i></span>
+                  <input class="input" type="text" id="nomeItem" placeholder="Nome do Item">
+                  <span class="icon is-small is-left"><i class="mdi mdi-package-variant"></i></span>
                 </p>
+              </div>
+              <div class="field mr-4 is-narrow">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select id="categoria">
+                      <option value="">Todas as Categorias</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="field mr-4 is-narrow">
+                <div class="control">
+                  <div class="select is-fullwidth">
+                    <select id="estoqueBaixo">
+                      <option value="">Todos os Níveis</option>
+                      <option value="baixo">Estoque Baixo</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               <div class="field">
                 <div class="control">
-                  <button id="filterEstoqueBtn" class="button is-primary">Filtrar</button>
+                  <button type="submit" class="button is-primary">Filtrar</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="tabs is-boxed">
-            <ul id="estoqueTabs"></ul>
+        </form>
+        <form id="addCategoriaForm" class="mb-4">
+          <div class="field is-horizontal is-spaced">
+            <div class="field-label is-normal"><label class="label">Adicionar Categoria</label></div>
+            <div class="field-body">
+              <div class="field mr-4">
+                <p class="control is-expanded">
+                  <input class="input" type="text" id="novaCategoria" placeholder="Nome da nova categoria" required>
+                </p>
+              </div>
+              <div class="field">
+                <div class="control">
+                  <button type="submit" class="button is-success">Adicionar</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div id="estoqueContent"></div>
+        </form>
+        <div class="table-container">
+          <table class="table is-fullwidth is-striped is-hoverable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Quantidade</th>
+                <th>Preço Unitário</th>
+                <th>Categoria</th>
+                <th>Última Atualização</th>
+              </tr>
+            </thead>
+            <tbody id="estoqueTable"></tbody>
+          </table>
+          <div id="pagination" class="mt-4"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Adicionar Item -->
+    <div class="modal" id="addItemModal">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Adicionar Item</p>
+          <button class="delete" aria-label="close" onclick="closeAddModal()"></button>
+        </header>
+        <section class="modal-card-body">
+          <form id="addItemForm">
+            <div class="field">
+              <label class="label">Nome</label>
+              <div class="control">
+                <input class="input" type="text" id="addNome" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Quantidade</label>
+              <div class="control">
+                <input class="input" type="number" id="addQuantidade" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Medida</label>
+              <div class="control">
+                <input class="input" type="text" id="addMedida" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Preço Unitário</label>
+              <div class="control">
+                <input class="input" type="number" id="addPreco" step="0.01" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Categoria</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="addCategoria" required>
+                    <option value="">Selecione uma categoria</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Decrição</label>
+              <div class="control">
+                <input class="input" type="text" id="addDescricao" required>
+              </div>
+            </div>
+          </form>
+        </section>
+        <footer class="modal-card-foot">
+          <button class="button is-success" onclick="salvarNovoItem()">Salvar</button>
+          <button class="button" onclick="closeAddModal()">Cancelar</button>
+        </footer>
+      </div>
+    </div>
+    <!-- Modal Editar Item -->
+    <div class="modal" id="editItemModal">
+      <div class="modal-background"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Editar Item</p>
+          <button class="delete" aria-label="close" onclick="closeEditModal()"></button>
+        </header>
+        <section class="modal-card-body">
+          <form id="editItemForm">
+            <div class="field">
+              <label class="label">ID</label>
+              <div class="control">
+                <input class="input" type="text" id="editId" readonly>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Nome</label>
+              <div class="control">
+                <input class="input" type="text" id="editNome" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Quantidade</label>
+              <div class="control">
+                <input class="input" type="number" id="editQuantidade" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Preço Unitário</label>
+              <div class="control">
+                <input class="input" type="number" id="editPreco" step="0.01" min="0" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Categoria</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id="editCategoria" required>
+                    <option value="">Selecione uma categoria</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </form>
+        </section>
+        <footer class="modal-card-foot">
+          <button class="button is-success" onclick="salvarEdicao()">Salvar</button>
+          <button class="button is-danger" onclick="confirmarDelecao()">Deletar</button>
+          <button class="button" onclick="closeEditModal()">Cancelar</button>
+        </footer>
+      </div>
+    </div>
+    <div class="modal" id="modalAddEstoque">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Adicionar Estoque</p>
+      <button class="delete" aria-label="close" onclick="fecharModalAddEstoque()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Item</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="selectAddEstoque"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Quantidade</label>
+        <div class="control">
+          <input class="input" type="number" id="quantidadeAddEstoque" min="1">
         </div>
       </div>
     </section>
-    <footer class="footer">
-      <div class="container-fluid">
-        <div class="level">
-          <div class="level-left">
-            <div class="level-item">© 2025, M</div>
-            <div class="level-item">
-              <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
-            </div>
+    <footer class="modal-card-foot">
+      <button class="button is-success" onclick="confirmarAddEstoque()">Adicionar</button>
+      <button class="button" onclick="fecharModalAddEstoque()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+<div class="modal" id="modalBaixaEstoque">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Baixar Estoque</p>
+      <button class="delete" aria-label="close" onclick="fecharModalBaixaEstoque()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Item</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="selectBaixaEstoque"></select>
           </div>
         </div>
       </div>
+      <div class="field">
+        <label class="label">Quantidade</label>
+        <div class="control">
+          <input class="input" type="number" id="quantidadeBaixaEstoque" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Descrição da Baixa</label>
+        <div class="control">
+          <input class="input" type="text" id="descricaoBaixaEstoque">
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-danger" onclick="confirmarBaixaEstoque()">Baixar</button>
+      <button class="button" onclick="fecharModalBaixaEstoque()">Cancelar</button>
     </footer>
   </div>
-  <script type="text/javascript" src="js/main.min.js"></script>
-  <script>
-    // Função para exibir notificações
-    function showNotification(message, type = 'is-danger') {
-      const container = document.getElementById('notification-container');
-      const notification = document.createElement('div');
-      notification.className = `notification ${type} is-light`;
-      notification.innerHTML = `
-        <button class="delete"></button>
-        ${message}
-      `;
-      container.appendChild(notification);
-      notification.querySelector('.delete').addEventListener('click', () => {
-        notification.classList.add('fade-out');
-        setTimeout(() => notification.remove(), 300);
-      });
-      setTimeout(() => {
-        notification.classList.add('fade-out');
-        setTimeout(() => notification.remove(), 300);
-      }, 5000);
-    }
+</div>
 
-    // Verificação de Permissões
-    document.addEventListener("DOMContentLoaded", () => {
-      const permissao = localStorage.getItem('permissao');
-      if (permissao !== 'vendas') {
-        showNotification('Você não tem permissão para acessar essa área!', 'is-danger');
-        setTimeout(() => { window.location.href = '../login.html'; }, 3000);
-        return;
-      }
-      carregarCategorias();
-    });
-
-    // Logout
-    document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
-      localStorage.removeItem('usuario');
-      localStorage.removeItem('permissao');
-      window.location.href = '../login.html';
-    });
-
-    // Função para carregar categorias
-    async function carregarCategorias() {
-      try {
-        const response = await fetch('/api/estoque/categorias');
-        if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-        const categorias = await response.json();
-        atualizarAbas(categorias);
-        atualizarEstoque();
-      } catch (error) {
-        showNotification('Erro ao carregar categorias: ' + error.message, 'is-danger');
-      }
-    }
-
-    // Função para atualizar abas
-    function atualizarAbas(categorias) {
-      const tabsUl = document.getElementById('estoqueTabs');
-      tabsUl.innerHTML = '';
-      categorias.forEach((cat, index) => {
-        const li = document.createElement('li');
-        li.className = index === 0 ? 'is-active' : '';
-        li.innerHTML = `<a onclick="mostrarAba('${cat.id}')">${cat.nome}</a>`;
-        tabsUl.appendChild(li);
-      });
-    }
-
-    // Função para atualizar estoque
-    async function atualizarEstoque(nome = '') {
-      try {
-        const query = nome ? `?nome=${encodeURIComponent(nome)}` : '';
-        const responseEstoque = await fetch(`/api/estoque${query}`);
-        if (!responseEstoque.ok) throw new Error(`Erro na resposta do servidor: ${responseEstoque.status}`);
-        const estoque = await responseEstoque.json();
-
-        const responseCats = await fetch('/api/estoque/categorias');
-        if (!responseCats.ok) throw new Error(`Erro na resposta do servidor: ${responseCats.status}`);
-        const categorias = await responseCats.json();
-
-        // Mapear categoria_id para nome
-        const categoriaMap = {};
-        categorias.forEach(cat => {
-          categoriaMap[cat.id] = cat.nome;
-        });
-
-        // Atualizar conteúdo
-        const contentDiv = document.getElementById('estoqueContent');
-        contentDiv.innerHTML = '';
-        categorias.forEach((cat, index) => {
-          const div = document.createElement('div');
-          div.id = `aba-${cat.id}`;
-          div.className = `tab-content ${index === 0 ? '' : 'is-hidden'}`;
-          div.innerHTML = `
-            <div class="table-container">
-              <table class="table is-fullwidth is-striped is-hoverable">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Nome do Produto</th>
-                    <th>Quantidade</th>
-                    <th>Medida</th>
-                    <th>Valor Unitário</th>
-                    <th>Categoria</th>
-                  </tr>
-                </thead>
-                <tbody id="estoqueTable-${cat.id}"></tbody>
-              </table>
-            </div>
-          `;
-          contentDiv.appendChild(div);
-
-          // Preencher tabela
-          const tbody = document.getElementById(`estoqueTable-${cat.id}`);
-          const itens = estoque.filter(item => item.categoria_id == cat.id);
-          itens.forEach(item => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${item.id}</td>
-              <td>${item.nome}</td>
-              <td>${item.quantidade}</td>
-              <td>${item.medida || 'N/A'}</td>
-              <td>R$ ${parseFloat(item.valor_unitario || 0).toFixed(2)}</td>
-              <td>${categoriaMap[item.categoria_id] || 'N/A'}</td>
-            `;
-            tbody.appendChild(row);
-          });
-          if (itens.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="has-text-centered">Nenhum item encontrado para ${cat.nome}</td></tr>`;
-          }
-        });
-      } catch (error) {
-        showNotification('Erro ao carregar estoque: ' + error.message, 'is-danger');
-      }
-    }
-
-    // Função para mostrar aba selecionada
-    function mostrarAba(categoriaId) {
-      document.querySelectorAll('.tabs li').forEach(li => li.classList.remove('is-active'));
-      document.querySelector(`.tabs a[onclick="mostrarAba('${categoriaId}')"]`).parentElement.classList.add('is-active');
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.add('is-hidden'));
-      document.getElementById(`aba-${categoriaId}`).classList.remove('is-hidden');
-    }
-
-    // Eventos
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('filterEstoqueBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        const nome = document.getElementById('buscaProduto').value;
-        atualizarEstoque(nome);
-      });
-
-      document.getElementById('refreshEstoqueBtn').addEventListener('click', () => {
-        document.getElementById('buscaProduto').value = '';
-        atualizarEstoque();
-      });
-    });
-  </script>
+  </section>
   <style>
-    .notification-container {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
-      max-width: 400px;
+    .pagination-list {
+    flex-wrap: wrap; /* Permite que os links quebrem linha em telas menores */
+    gap: 0.5rem; /* Espaçamento entre links */
+  }
+  @media (max-width: 768px) {
+    .pagination-list {
+      justify-content: center; /* Centraliza em telas pequenas */
     }
-    .notification {
-      margin-bottom: 10px;
-      opacity: 1;
-      transition: opacity 0.3s ease-in-out;
+    .level-left p {
+      font-size: 0.9rem; /* Ajusta tamanho do texto */
     }
-    .notification.fade-out {
-      opacity: 0;
-    }
+  }
     .table-container {
       max-height: 400px;
       overflow-y: auto;
@@ -305,14 +392,657 @@
       top: 0;
       z-index: 10;
     }
-    .tabs.is-boxed li.is-active a {
-      background-color: #3273dc;
-      color: #fff;
-      border-color: #3273dc;
+    .field.is-horizontal.is-spaced .field-body .field {
+      margin-bottom: 0.75rem;
     }
-    .tab-content.is-hidden {
-      display: none;
+    .modal-card-body {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .has-background-danger-light {
+      background-color: #fff5f5;
     }
   </style>
+  <footer class="footer">
+    <div class="container-fluid">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item">© 2025, M</div>
+          <div class="level-item">
+            <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+          </div>
+        </div>
+        <div class="level-right"><div class="level-item"></div></div>
+      </div>
+    </div>
+  </footer>
+</div>
+<script>
+
+
+// Logout
+document.querySelector('.navbar-item[title="Log out"]').addEventListener('click', () => {
+  localStorage.removeItem('usuario');
+  localStorage.removeItem('permissao');
+  window.location.href = '../login.html';
+});
+// Variáveis globais para paginação
+let currentPage = 1;
+const itemsPerPage = 10;
+
+// Função para formatar datas (mantida do original)
+function formatarData(data) {
+  try {
+    const d = new Date(data);
+    if (isNaN(d.getTime())) throw new Error('Data inválida');
+    return d.toLocaleDateString('pt-BR');
+  } catch (error) {
+    console.error('Erro ao formatar data:', error);
+    return 'Data inválida';
+  }
+}
+
+document.getElementById('addEstoqueBtn').addEventListener('click', abrirModalAddEstoque);
+document.getElementById('baixarEstoqueBtn').addEventListener('click', abrirModalBaixaEstoque);
+
+async function abrirModalAddEstoque() {
+  const select = document.getElementById('selectAddEstoque');
+  const items = await carregarItensEstoque();
+  preencherSelectItens(select, items);
+  document.getElementById('modalAddEstoque').classList.add('is-active');
+}
+
+function fecharModalAddEstoque() {
+  document.getElementById('modalAddEstoque').classList.remove('is-active');
+}
+
+async function abrirModalBaixaEstoque() {
+  const select = document.getElementById('selectBaixaEstoque');
+  const items = await carregarItensEstoque();
+  preencherSelectItens(select, items);
+  document.getElementById('modalBaixaEstoque').classList.add('is-active');
+}
+
+function fecharModalBaixaEstoque() {
+  document.getElementById('modalBaixaEstoque').classList.remove('is-active');
+}
+
+async function carregarItensEstoque() {
+  const response = await fetch('/api/estoque');
+  const data = await response.json();
+  return data.itens || [];
+
+}
+
+function preencherSelectItens(select, items) {
+  select.innerHTML = '';
+  items.forEach(item => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = `${item.nome} (Qtd: ${item.quantidade})`;
+    select.appendChild(option);
+  });
+}
+async function confirmarAddEstoque() {
+  const id = document.getElementById('selectAddEstoque').value;
+  const quantidade = parseInt(document.getElementById('quantidadeAddEstoque').value);
+
+  if (!id || quantidade <= 0) {
+     mostrarNotificacao('Selecione um item e informe uma quantidade válida.', 'is-danger');
+    return;
+  }
+
+  await fetch('/api/estoque/entrada', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, quantidade })
+  });
+mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
+  fecharModalAddEstoque();
+  atualizarEstoque();
+}
+
+async function confirmarBaixaEstoque() {
+  const id = document.getElementById('selectBaixaEstoque').value;
+  const quantidade = parseInt(document.getElementById('quantidadeBaixaEstoque').value);
+  const descricao = document.getElementById('descricaoBaixaEstoque').value;
+
+  if (!id || quantidade <= 0 || !descricao) {
+     mostrarNotificacao('Preencha todos os campos corretamente.', 'is-danger');
+    return;
+  }
+
+  const res = await fetch('/api/estoque/saida', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, quantidade, descricao })
+  });
+
+  const result = await res.json();
+  if (!res.ok) {
+     mostrarNotificacao(result.erro || 'Erro na baixa');
+    return;
+  }
+mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
+  fecharModalBaixaEstoque();
+  atualizarEstoque();
+}
+
+// Função de notificação com Bulma (melhorada)
+function mostrarNotificacao(mensagem, tipo) {
+  const notificacao = document.createElement('div');
+  notificacao.className = `notification ${tipo} is-light`;
+  notificacao.style.position = 'fixed';
+  notificacao.style.top = '10px';
+  notificacao.style.right = '10px';
+  notificacao.style.zIndex = '1000';
+  notificacao.style.maxWidth = '300px';
+  notificacao.textContent = mensagem;
+  document.body.appendChild(notificacao);
+  setTimeout(() => notificacao.remove(), 3000);
+}
+
+// Função para buscar e atualizar lançamentos
+async function atualizarEstoque(filtros = {}) {
+  const tbody = document.getElementById('estoqueTable');
+  const pagination = document.getElementById('pagination');
+  if (!tbody || !pagination) return;
+
+  filtros.page = currentPage;
+  filtros.limit = itemsPerPage;
+
+  const query = new URLSearchParams(filtros).toString();
+  tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Carregando...</td></tr>';
+
+  try {
+    const response = await fetch(`/api/estoque?${query}`);
+    if (!response.ok) throw new Error('Erro ao carregar estoque');
+
+    const { itens: estoque, total, page, totalPages } = await response.json();
+    tbody.innerHTML = '';
+
+    if (!Array.isArray(estoque) || estoque.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhum item encontrado</td></tr>';
+      pagination.innerHTML = '';
+      return;
+    }
+
+    estoque.forEach(item => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${item.id}</td>
+        <td>${item.nome}</td>
+        <td>${item.quantidade}</td>
+        <td>R$ ${parseFloat(item.valor_unitario).toFixed(2)}</td>
+        <td>${item.categoria || '-'}</td>
+        <td>${new Date(item.ultima_atualizacao).toLocaleDateString('pt-BR')}</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    renderPagination(page, totalPages, total);
+  } catch (err) {
+    console.error(err);
+    tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Erro ao carregar estoque</td></tr>';
+    pagination.innerHTML = '';
+  }
+}
+
+
+// Função para renderizar paginação com links limitados
+function renderPagination(currentPage, totalPages, total) {
+  const pagination = document.getElementById('pagination');
+  if (!pagination) return;
+
+  const maxPagesToShow = 5; // Máximo de links de página visíveis
+  const pages = [];
+  const startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+  const endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+  // Ajustar startPage se endPage estiver no limite
+  const adjustedStartPage = Math.max(1, endPage - maxPagesToShow + 1);
+
+  // Adicionar primeira página e reticências, se necessário
+  if (adjustedStartPage > 1) {
+    pages.push(1);
+    if (adjustedStartPage > 2) pages.push('...');
+  }
+
+  // Adicionar páginas no intervalo
+  for (let page = adjustedStartPage; page <= endPage; page++) {
+    pages.push(page);
+  }
+
+  // Adicionar última página e reticências, se necessário
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) pages.push('...');
+    pages.push(totalPages);
+  }
+
+  // Renderizar HTML da paginação
+  pagination.innerHTML = `
+    <div class="level">
+      <div class="level-left">
+        <p class="level-item">Mostrando ${(currentPage - 1) * itemsPerPage + 1} a ${Math.min(currentPage * itemsPerPage, total)} de ${total} lançamentos</p>
+      </div>
+      <div class="level-right">
+        <nav class="pagination is-right" role="navigation" aria-label="pagination">
+          <button class="pagination-previous button" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">Anterior</button>
+          <button class="pagination-next button" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Próximo</button>
+          <ul class="pagination-list">
+            ${pages.map(page => page === '...' ? `
+              <li><span class="pagination-ellipsis">&hellip;</span></li>
+            ` : `
+              <li>
+                <a class="pagination-link button ${page === currentPage ? 'is-current' : ''}" onclick="changePage(${page})">${page}</a>
+              </li>
+            `).join('')}
+          </ul>
+        </nav>
+      </div>
+    </div>`;
+}
+
+function changePage(page) {
+  if (page < 1) return;
+  currentPage = page;
+  const filtros = {
+    nome: document.getElementById('nomeItem')?.value || '',
+    categoria: document.getElementById('categoria')?.value || '',
+    estoque_baixo: document.getElementById('estoqueBaixo')?.value || ''
+  };
+  atualizarEstoque(filtros);
+}
+
+
+// Função para filtrar lançamentos
+function filtrarLancamentos() {
+  currentPage = 1; // Resetar para a primeira página ao filtrar
+  const filtros = {
+    descricao: document.getElementById('filtroDescricao')?.value || '',
+    categoria: document.getElementById('filtroCategoria')?.value || '',
+    tipo: document.getElementById('filtroTipo')?.value || ''
+  };
+  atualizarEstoque(filtros);
+}
+
+// Inicialização (exemplo, inclua outros event listeners conforme necessário)
+document.addEventListener('DOMContentLoaded', () => {
+  atualizarEstoque();
+  const filterForm = document.getElementById('filterLancamentosForm');
+  if (filterForm) {
+    filterForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      filtrarLancamentos();
+    });
+  }
+  document.getElementById('addLancamentoBtn')?.addEventListener('click', openRegisterModal);
+  document.getElementById('exportCsvBtn')?.addEventListener('click', exportarCsv);
+  document.getElementById('refreshBtn')?.addEventListener('click', () => atualizarEstoque());
+});
+// Função para carregar categorias do backend
+async function carregarCategorias() {
+
+  try {
+    const response = await fetch('/api/categorias', {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Erro ao carregar categorias: ${response.status} ${response.statusText}\nResposta: ${text.substring(0, 100)}`);
+    }
+    const categorias = await response.json();
+
+    return categorias;
+  } catch (error) {
+    console.error('Erro ao carregar categorias:', error);
+    mostrarNotificacao('Não foi possível carregar as categorias: ', 'is-danger');
+    return [];
+  }
+}
+
+// Função para popular um <select> com categorias
+function popularSelectComCategorias(selectElement, categorias, valorSelecionado = '') {
+  if (!selectElement) {
+    console.error('Elemento <select> não encontrado');
+    return;
+  }
+
+  selectElement.innerHTML = '<option value="">Selecione uma categoria</option>';
+  categorias.forEach(categoria => {
+    const option = document.createElement('option');
+    option.value = categoria.id;
+    option.textContent = categoria.nome;
+    if (categoria.id === valorSelecionado) {
+      option.selected = true;
+    }
+    selectElement.appendChild(option);
+  });
+}
+
+// Função para adicionar uma nova categoria
+async function addCategoria() {
+
+  const novaCategoriaInput = document.getElementById('novaCategoria');
+  const novaCategoria = novaCategoriaInput?.value.trim();
+
+  if (!novaCategoria) {
+    mostrarNotificacao('Por favor, insira o nome da nova categoria', 'is-warning');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/categorias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ novaCategoria })
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    mostrarNotificacao(`${data.mensagem}`, 'is-success');
+    novaCategoriaInput.value = '';
+    const categorias = await carregarCategorias();
+    const selectAddCategoria = document.getElementById('addCategoria');
+    const selectEditCategoria = document.getElementById('editCategoria');
+    const selectFiltroCategoria = document.getElementById('categoria');
+    if (selectAddCategoria) {
+      popularSelectComCategorias(selectAddCategoria, categorias);
+    }
+    if (selectEditCategoria) {
+      popularSelectComCategorias(selectEditCategoria, categorias);
+    }
+    if (selectFiltroCategoria) {
+      selectFiltroCategoria.innerHTML = '<option value="">Todas as Categorias</option>';
+      categorias.forEach(categoria => {
+        const option = document.createElement('option');
+        option.value = categoria.id;
+        option.textContent = categoria.nome;
+        selectFiltroCategoria.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao adicionar categoria:', error);
+    mostrarNotificacao('Erro ao adicionar categoria: ', 'is-danger');
+  }
+}
+
+// Função para abrir modal de adição
+function abrirAddModal() {
+  const modal = document.getElementById('addItemModal');
+  if (!modal) {
+    console.error('Modal addItemModal não encontrado');
+    return;
+  }
+  modal.classList.add('is-active');
+  carregarCategorias().then(categorias => {
+    const selectAddCategoria = document.getElementById('addCategoria');
+    if (selectAddCategoria) {
+      popularSelectComCategorias(selectAddCategoria, categorias);
+    } else {
+      console.error('Elemento addCategoria não encontrado');
+    }
+  });
+}
+
+// Função para fechar modal de adição
+function closeAddModal() {
+  const modal = document.getElementById('addItemModal');
+  if (modal) {
+    modal.classList.remove('is-active');
+    const form = document.getElementById('addItemForm');
+    if (form) form.reset();
+  }
+}
+
+// Função para salvar novo item
+async function salvarNovoItem() {
+  const nome = document.getElementById('addNome')?.value;
+  const medida = document.getElementById('addMedida')?.value;
+  const descricao = document.getElementById('addDescricao')?.value;
+  const quantidade = parseInt(document.getElementById('addQuantidade')?.value);
+  const preco = parseFloat(document.getElementById('addPreco')?.value);
+  const categoria = document.getElementById('addCategoria')?.value;
+
+  if (!nome || isNaN(quantidade) || isNaN(preco) || !categoria || !medida || !categoria) {
+    mostrarNotificacao('Preencha todos os campos corretamente', 'is-warning');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/estoque', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ nome, quantidade, preco, categoria, descricao, medida})
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    mostrarNotificacao('Item adicionado com sucesso!', 'is-success');
+    closeAddModal();
+    atualizarEstoque();
+  } catch (error) {
+    console.error('Erro ao adicionar item:', error);
+    mostrarNotificacao('Erro ao adicionar item: ' + error.message, 'is-danger');
+  }
+}
+
+// Função para abrir modal de edição
+function abrirEditModal(item) {
+  const modal = document.getElementById('editItemModal');
+  if (!modal) {
+    console.error('Modal editItemModal não encontrado');
+    return;
+  }
+  document.getElementById('editId').value = item.id;
+  document.getElementById('editNome').value = item.nome;
+  document.getElementById('editQuantidade').value = item.quantidade;
+  document.getElementById('editPreco').value = parseFloat(item.valor_unitario).toFixed(2);
+  modal.classList.add('is-active');
+  carregarCategorias().then(categorias => {
+    const selectEditCategoria = document.getElementById('editCategoria');
+    if (selectEditCategoria) {
+      popularSelectComCategorias(selectEditCategoria, categorias, item.categoria);
+    } else {
+      console.error('Elemento editCategoria não encontrado');
+    }
+  });
+}
+
+// Função para fechar modal de edição
+function closeEditModal() {
+  const modal = document.getElementById('editItemModal');
+  if (modal) modal.classList.remove('is-active');
+}
+
+// Função para salvar edição
+async function salvarEdicao() {
+  const id = document.getElementById('editId')?.value;
+  const nome = document.getElementById('editNome')?.value;
+  const quantidade = parseInt(document.getElementById('editQuantidade')?.value);
+  const preco = parseFloat(document.getElementById('editPreco')?.value);
+  const categoria = document.getElementById('editCategoria')?.value;
+
+  if (!id || !nome || isNaN(quantidade) || isNaN(preco) || !categoria) {
+    mostrarNotificacao('Preencha todos os campos corretamente', 'is-warning');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/estoque/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ nome, quantidade, preco, categoria })
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
+    closeEditModal();
+    atualizarEstoque();
+  } catch (error) {
+    console.error('Erro ao atualizar item:', error);
+    mostrarNotificacao('Erro ao atualizar item: ', 'is-danger');
+
+  }
+}
+
+// Função para confirmar deleção
+function confirmarDelecao() {
+  abrirModalConfirmacao('Tem certeza que deseja deletar?', () => {
+  deletarItem();
+});
+
+}
+
+// Função para deletar item
+async function deletarItem() {
+  const id = document.getElementById('editId')?.value;
+  if (!id) {
+    mostrarNotificacao('ID do item não encontrado', 'is-warning');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/estoque/${id}`, {
+      method: 'DELETE',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.erro || `Erro na resposta do servidor: ${response.status} ${response.statusText}`);
+    }
+    mostrarNotificacao('Item deletado com sucesso!', 'is-success');
+    closeEditModal();
+    atualizarEstoque();
+  } catch (error) {
+    console.error('Erro ao deletar item:', error);
+    mostrarNotificacao('Erro ao deletar item: ', 'is-danger');
+  }
+}
+
+
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    // Carrega o estoque
+    atualizarEstoque();
+
+    // Carrega categorias no filtro
+    carregarCategorias().then(categorias => {
+      const selectFiltroCategoria = document.getElementById('categoria');
+      if (selectFiltroCategoria) {
+        selectFiltroCategoria.innerHTML = '<option value="">Todas as Categorias</option>';
+        categorias.forEach(categoria => {
+          const option = document.createElement('option');
+          option.value = categoria.id;
+          option.textContent = categoria.nome;
+          selectFiltroCategoria.appendChild(option);
+        });
+      }
+    });
+
+    // Filtro de estoque
+    const filterForm = document.getElementById('filterEstoqueForm');
+    currentPage = 1;
+    if (filterForm) {
+      filterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const filtros = {
+          nome: document.getElementById('nomeItem')?.value || '',
+          categoria: document.getElementById('categoria')?.value || '',
+          estoque_baixo: document.getElementById('estoqueBaixo')?.value || ''
+        };
+        atualizarEstoque(filtros);
+      });
+    } else {
+      console.error('Formulário filterEstoqueForm não encontrado');
+    }
+
+    // Botão de atualização
+    const refreshBtn = document.getElementById('refreshEstoqueBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        atualizarEstoque();
+      });
+    } else {
+      console.error('Botão refreshEstoqueBtn não encontrado');
+    }
+
+    // Botão de adicionar item
+    const addItemBtn = document.getElementById('addItemBtn');
+    if (addItemBtn) {
+      addItemBtn.addEventListener('click', abrirAddModal);
+    } else {
+      console.error('Botão addItemBtn não encontrado');
+    }
+
+   
+
+    // Formulário de adicionar categoria
+    const addCategoriaForm = document.getElementById('addCategoriaForm');
+    if (addCategoriaForm) {
+      addCategoriaForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        addCategoria();
+      });
+    } else {
+      console.error('Formulário addCategoriaForm não encontrado');
+    }
+  } catch (error) {
+    console.error('Erro na inicialização:', error);
+    mostrarNotificacao('Erro na inicialização da página: ', 'is-danger');
+  }
+});
+let callbackConfirmacao = null;
+
+function abrirModalConfirmacao(mensagem, callback) {
+  document.getElementById("mensagemConfirmacao").textContent = mensagem;
+  document.getElementById("modalConfirmacao").classList.add("is-active");
+  callbackConfirmacao = callback;
+}
+
+function fecharModalConfirmacao() {
+  document.getElementById("modalConfirmacao").classList.remove("is-active");
+  callbackConfirmacao = null;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnConfirmar").addEventListener("click", () => {
+    if (typeof callbackConfirmacao === "function") callbackConfirmacao();
+    fecharModalConfirmacao();
+  });
+});
+
+</script>
+
+<!-- Scripts below are for demo only -->
+<script type="text/javascript" src="js/main.min.js"></script>
+
+<!-- Icons below are for demo only. Feel free to use any icon pack. Docs: https://bulma.io/documentation/elements/icon/ -->
+<link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
+<div id="notificacao" class="notification is-hidden" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; max-width: 300px;"></div>
+<!-- Modal de Confirmação -->
+<div class="modal" id="modalConfirmacao">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Confirmação</p>
+      <button class="delete" aria-label="close" onclick="fecharModalConfirmacao()"></button>
+    </header>
+    <section class="modal-card-body" id="mensagemConfirmacao">
+      Você tem certeza?
+    </section>
+    <footer class="modal-card-foot">
+      <button class="button is-success" id="btnConfirmar">Sim</button>
+      <button class="button" onclick="fecharModalConfirmacao()">Cancelar</button>
+    </footer>
+  </div>
+</div>
+
 </body>
 </html>

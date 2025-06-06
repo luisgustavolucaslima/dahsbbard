@@ -45,16 +45,11 @@
       <p class="menu-label">Geral</p>
       <ul class="menu-list">
         <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-        <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuarios</span></a></li>
         <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
         <li><a href="lancamentos.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+        <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
       </ul>
       <p class="menu-label">Logic Ice</p>
-      <ul class="menu-list">
-        <li><a href="../producao/producao.html" class="has-icon"><span class="icon has-update-mark"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
-        <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
-        <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
-      </ul>
     </div>
   </aside>
   <section class="section is-title-bar">
@@ -303,7 +298,6 @@
         </section>
         <footer class="modal-card-foot">
           <button class="button is-success" onclick="salvarEdicaoRegistro()">Salvar Alterações</button>
-          <button class="button is-danger" onclick="confirmarDelecaoRegistro()">Excluir Registro</button>
           <button class="button" onclick="closeEditModal()">Cancelar</button>
         </footer>
       </div>
@@ -741,7 +735,7 @@
         }, 1000);
         return;
       }
-      if (permissao !== 'admin') {
+      if (permissao !== 'vendas') {
         mostrarNotificacao('Você não tem permissão para acessar essa área!', 'is-danger');
         setTimeout(() => {
           window.location.href = '../login.html';
