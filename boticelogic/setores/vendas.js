@@ -105,13 +105,22 @@ const handleCallbacks = async (query, sessao, bot, db) => {
           bot
         );
       }
-      sessao.etapa = 'finalizar';
+      sessao.etapa = 'metodo_pagamento';
       sessao.lastUpdated = Date.now();
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '💸 Pix', callback_data: 'pix' }],
+          [{ text: '💵 Dinheiro', callback_data: 'dinheiro' }],
+          [{ text: '💵💸 Dinheiro e Pix', callback_data: 'dinheiro_pix' }],
+          [{ text: '🛑 Cancelar', callback_data: 'cancelar' }],
+        ],
+      };
       await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
-        `📍 *Por favor, envie o endereço de entrega ou a localização.*`,
-        bot
+        `💳 *Escolha o método de pagamento:*`,
+        bot,
+        { reply_markup: keyboard }
       );
     }
 
@@ -213,7 +222,7 @@ const handleCallbacks = async (query, sessao, bot, db) => {
     
         // Save sale in vendas table
         const [result] = await connection.query(
-          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total valor_dinheiro, recebido, status, data, vendedor_id)
+          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total, valor_dinheiro, recebido, status, data, vendedor_id)
            VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)`,
           [
             sessao.numero_cliente || 'Não informado',
@@ -294,7 +303,9 @@ const handleCallbacks = async (query, sessao, bot, db) => {
         await bot.answerCallbackQuery(query.id);
         await sendMessage(chatId, `✅ *Venda finalizada com sucesso! Pedido registrado.*`, bot);
         return showInitialMenu(chatId, sessao.nome, bot);
-      } catch (err) {
+      }
+
+catch (err) {
         await connection.rollback();
         console.error(`[ERROR] Erro ao finalizar pedido:`, err.message);
         await bot.answerCallbackQuery(query.id);
@@ -577,26 +588,6 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
     return;
   }
 
-  if (sessao.etapa === 'finalizar') {
-    sessao.etapa = 'metodo_pagamento';
-    sessao.lastUpdated = Date.now();
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: '💸 Pix', callback_data: 'pix' }],
-        [{ text: '💵 Dinheiro', callback_data: 'dinheiro' }],
-        [{ text: '💵💸 Dinheiro e Pix', callback_data: 'dinheiro_pix' }],
-        [{ text: '🛑 Cancelar', callback_data: 'cancelar' }],
-      ],
-    };
-    await sendMessage(
-      chatId,
-      `💳 *Escolha o método de pagamento:*`,
-      bot,
-      { reply_markup: keyboard }
-    );
-    return;
-  }
-
   if (sessao.etapa === 'comprovante') {
     if (texto && texto.toLowerCase() === 'sem comprovante') {
       sessao.comprovante_pagamento = 'Sem comprovante';
@@ -713,8 +704,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
     if (sessao.metodo_pagamento === 'dinheiro_pix' && sessao.valor_dinheiro !== undefined) {
       mensagem += `*Valor em dinheiro:* R$${sessao.valor_dinheiro.toFixed(2)}\n`;
     }
-    mensagem += `*Número do cliente:* ${escapeMarkdown(sessao.numero_cliente)}\n`;
-    mensagem += `*Comprovante:* ${sessao.comprovante_pagamento ? 'Enviado' : 'Sem comprovante'}`;
+    mensagem += `*Número do cliente:* ${escapeMarkdown(sessao.numero_cliente)}`;
     await sendMessage(chatId, mensagem, bot, { reply_markup: keyboard });
     return;
   }
