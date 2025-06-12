@@ -130,42 +130,64 @@ async function tratarOrganizarRota(texto, msg, sessao, db, bot, chatId, sessoes,
   await criarTabelaRotasSalvas(db);
 
   // Iniciar ou continuar rota
-  if (texto === 'organizar_rota' || (msg && msg.data === 'iniciar_rota')) {
-    if (!sessaoAtual.rotaAtiva) {
-      await enviarMensagem(chatId, '⚠️ *Você deve iniciar uma rota antes de organizá-la.*', {
-        reply_markup: getSubmenuOrganizarRota()
+  // Iniciar ou continuar rota
+if (texto === 'organizar_rota' || (msg && msg.data === 'iniciar_rota')) {
+  console.log(`[DEBUG] Iniciando rota para chatId=${chatId}, usuario_id=${sessaoAtual.usuario_id}`);
+  sessaoAtual.rotaAtiva = true; // Definir rotaAtiva explicitamente
+  sessaoAtual.rota = [];
+  sessaoAtual.pontoInicial = null;
+  sessaoAtual.pedidoId = null;
+  sessaoAtual.etapa = 'aguardando_ponto_inicial'; // Permitir entrada do ponto inicial
+  sessoes.set(chatId, sessaoAtual);
+
+  // Buscar pedidos válidos atribuídos ao entregador
+  try {
+    const [pedidos] = await db.query(`
+      SELECT e.id, e.cliente_numero, e.endereco
+      FROM entregas e
+      JOIN pedidos_diarios p ON e.pedido_id = p.id
+      WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+    `, [sessaoAtual.usuario_id]);
+    console.log(`[DEBUG] Pedidos encontrados: ${pedidos.length}`);
+
+    if (pedidos.length === 0) {
+      sessaoAtual.rotaAtiva = false;
+      sessaoAtual.etapa = 'submenu_organizar_rota';
+      sessaoAtual.submenu = 'organizar_rota';
+      sessoes.set(chatId, sessaoAtual);
+      await enviarMensagem(chatId, '📭 *Nenhum pedido com status "rua" atribuído a você.*', {
+        reply_markup: getSubmenuOrganizarRota(),
+        parse_mode: 'Markdown'
       });
       return true;
     }
-    // Verificar se já existe uma rota ativa
-    const rotaAtiva = await obterRotaAtiva(db, sessaoAtual.usuario_id);
-    if (rotaAtiva) {
-      sessaoAtual.pontoInicial = { address: rotaAtiva[0]?.address || 'Endereço não definido' };
-      sessaoAtual.rota = rotaAtiva;
-      sessaoAtual.etapa = 'selecionar_pedido';
-      sessoes.set(chatId, sessaoAtual);
-      const buttons = rotaAtiva.map((loc, index) => [{ text: `Seq. ${index + 1} - *Pedido #${loc.pedidoId}*`, callback_data: `selecionar_pedido_${loc.pedidoId}` }]);
-      buttons.push([{ text: '✅ Concluir Edição', callback_data: 'concluir_edicao' }]);
-      buttons.push([{ text: '🚫 Cancelar', callback_data: 'cancelar_rota' }, { text: '🛑 Sair', callback_data: 'sair' }]);
-      await enviarMensagem(chatId, '📋 *Rota ativa encontrada. Selecione um pedido para editar o endereço ou conclua a edição:*', {
-        reply_markup: { inline_keyboard: buttons },
-        parse_mode: 'Markdown'
-      });
-    } else {
-      await enviarMensagem(chatId, `📍 *Digite o endereço do ponto inicial da rota em ${CIDADE_REFERENCIA}.*`, {
-        reply_markup: {
-          inline_keyboard: [[{ text: '🚫 Cancelar', callback_data: 'cancelar_rota' }, { text: '🛑 Sair', callback_data: 'sair' }]]
-        }
-      });
-      sessaoAtual.etapa = 'aguardando_ponto_inicial';
-      sessaoAtual.rota = [];
-      sessaoAtual.pontoInicial = null;
-      sessaoAtual.pedidoId = null;
-      sessoes.set(chatId, sessaoAtual);
-    }
-    console.log(`[DEBUG] Iniciando/continuando fluxo de organizar rota para chatId=${chatId}`);
+
+    // Criar botões para os pedidos
+    const buttons = pedidos.map((p, index) => [{ text: `Seq. ${index + 1} - *Pedido #${p.id}*`, callback_data: `selecionar_pedido_${p.id}` }]);
+    buttons.push([{ text: '✅ Concluir Edição', callback_data: 'concluir_edicao' }]);
+    buttons.push([{ text: '🚫 Cancelar', callback_data: 'cancelar_rota' }, { text: '🛑 Sair', callback_data: 'sair' }]);
+
+    // Enviar mensagem com o menu de pedidos e solicitação do ponto inicial
+    await enviarMensagem(chatId, `📍 *Digite o endereço do ponto inicial da rota em ${CIDADE_REFERENCIA} ou selecione um pedido para editar o endereço:*`, {
+      reply_markup: { inline_keyboard: buttons },
+      parse_mode: 'Markdown'
+    });
+
+    console.log(`[DEBUG] Menu de pedidos enviado para chatId=${chatId}, etapa=${sessaoAtual.etapa}`);
+  } catch (err) {
+    console.error(`[ERROR] Erro ao buscar pedidos: ${err.message}`);
+    sessaoAtual.rotaAtiva = false;
+    sessaoAtual.etapa = 'submenu_organizar_rota';
+    sessaoAtual.submenu = 'organizar_rota';
+    sessoes.set(chatId, sessaoAtual);
+    await enviarMensagem(chatId, '⚠️ *Erro ao carregar pedidos. Verifique sua conexão e tente novamente.*', {
+      reply_markup: getSubmenuOrganizarRota(),
+      parse_mode: 'Markdown'
+    });
     return true;
   }
+  return true;
+}
 
   // Finalizar rota
   if (msg && msg.data === 'finalizar_rota') {
@@ -536,12 +558,10 @@ async function tratarCallbackOrganizarRota(query, sessao, db, bot, chatId, sesso
       console.log(`[DEBUG] Pedidos para geração da rota: ${pedidos.length}`);
 
       if (pedidos.length === 0) {
-        sessao.etapa = 'submenu_organizar_rota';
-        sessao.submenu = 'organizar_rota';
-        sessao.pontoInicial = null;
-        sessao.pedidoId = null;
-        sessao.rota = [];
-        sessoes.set(chatId, sessao);
+        sessaoAtual.rotaAtiva = false;
+        sessaoAtual.etapa = 'submenu_organizar_rota';
+        sessaoAtual.submenu = 'organizar_rota';
+        sessoes.set(chatId, sessaoAtual);
         await enviarMensagem(chatId, '📭 *Nenhum pedido com status "rua" atribuído a você.*', {
           reply_markup: getSubmenuOrganizarRota()
         });

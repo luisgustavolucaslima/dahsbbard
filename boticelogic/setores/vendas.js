@@ -54,7 +54,7 @@ const showInitialMenu = async (chatId, nomeUsuario, bot) => {
 };
 
 // Handle callback queries
-const handleCallbacks = async (query, sessao, bot, db) => {
+const handleCallbacks = async (query, sessao, bot, db, sessoes) => {
   const chatId = query.message?.chat?.id?.toString();
   const data = query.data;
 
@@ -320,34 +320,49 @@ catch (err) {
     }
 
     if (data === 'lista') {
-      const [categorias] = await db.query(`SELECT id, nome FROM categorias_estoque`);
-      let mensagem = '📋 *Lista de produtos por categoria:*\n\n';
-      if (!categorias || categorias.length === 0) {
-        mensagem += '⚠️ *Nenhuma categoria disponível no momento.*';
-      } else {
-        for (const categoria of categorias) {
-          const [produtos] = await db.query(
-            `SELECT nome, medida, quantidade, valor_unitario
-             FROM estoque
-             WHERE categoria_id = ? AND quantidade > 0`,
-            [categoria.id]
-          );
-          if (produtos && produtos.length > 0) {
-            mensagem += `*${escapeMarkdown(categoria.nome.toUpperCase())}*\n`;
-            produtos.forEach(produto => {
-              const valorUnitario = parseFloat(produto.valor_unitario);
-              const valorFormatado = isNaN(valorUnitario) ? 'Indisponível' : `R$${valorUnitario.toFixed(2)}`;
-              mensagem += `- ${escapeMarkdown(produto.nome)} (${produto.medida}): ${produto.quantidade} disponíveis, ${valorFormatado}/${produto.medida}\n`;
-            });
-            mensagem += '\n';
-          }
-        }
-      }
-      await bot.answerCallbackQuery(query.id);
-      await sendMessage(chatId, mensagem || '⚠️ *Nenhum produto disponível no momento.*', bot);
-      sessao.etapa = null;
-      return showInitialMenu(chatId, sessao.nome, bot);
+  const [categorias] = await db.query(`
+    SELECT DISTINCT categoria 
+    FROM estoque 
+    WHERE quantidade > 0
+  `);
+
+  let mensagem = 
+`🚨 *NÃO REPASSE A LISTA!*
+
+🕐 *ENTREGA DE MANHÃ, MEIO DA TARDE, E FIM DA TARDE!*
+💸 *PIX SÓ ANTECIPADO! FAVOR ENVIAR O COMPROVANTE!*
+🔑 *ANTES DE FAZER O PIX PEÇA A CHAVE!*
+💵 *EVITE PIX! PREFERÊNCIA NO DINHEIRO!*
+🛒 *PEDIDO MÍNIMO R$50,00!*
+⚡ *ENTREGA GRÁTIS! ENTREGA RÁPIDA!*
+
+`;
+
+  for (const cat of categorias) {
+    const [produtos] = await db.query(`
+      SELECT nome, medida, quantidade, valor_unitario
+      FROM estoque
+      WHERE categoria = ? AND quantidade > 0
+    `, [cat.categoria]);
+
+    if (produtos.length > 0) {
+      mensagem += `_${cat.categoria}_\n`;
+      produtos.forEach(p => {
+        mensagem += `• ${p.nome} – R$${parseFloat(p.valor_unitario).toFixed(2)}\n`;
+      });
+      mensagem += '\n';
     }
+  }
+
+  mensagem +=
+`⚡ *Antecipe seu pedido, Evite ficar esperando.*`;
+
+  await bot.answerCallbackQuery(query.id);
+  await sendMessage(chatId, mensagem, bot);
+  sessao.etapa = null;
+  return showInitialMenu(chatId, sessao.nome, bot);
+}
+
 
     if (data === 'laranja') {
       const [laranja] = await db.query(`SELECT pix, qrcodex64 FROM laranja WHERE status = 1 LIMIT 1`);
@@ -359,7 +374,12 @@ catch (err) {
       await bot.answerCallbackQuery(query.id);
       if (qrcodex64) {
         try {
-          const buffer = Buffer.from(qrcodex64, 'base64');
+          const base64Data = qrcodex64.split(',')[1]; // remove "data:image/png;base64,"
+          const buffer = Buffer.from(base64Data, 'base64');
+          if (!base64Data) {
+            throw new Error('QR code inválido ou mal formatado');
+              }
+  
           await bot.sendPhoto(chatId, buffer, {
             caption: `🟠 *Pix para pagamento:*\n${escapeMarkdown(pix)}\n\nUse o QR Code acima ou copie o código Pix.`,
           });
@@ -747,7 +767,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
 };
 
 // Exportar função compatível com chatbot.js
-module.exports = async (texto, msg, sessao, db, bot) => {
+module.exports = async (texto, msg, sessao, db, bot, sessoes) => {
   if (!sessao) {
     console.error('[ERROR] Sessão não definida ao chamar vendas.js');
     return sendMessage(
@@ -766,7 +786,7 @@ module.exports = async (texto, msg, sessao, db, bot) => {
   console.log('[DEBUG] Tem imagem:', temImagem);
 
   if (ehCallback) {
-    return handleCallbacks(texto, sessao, bot, db);
+  return handleCallbacks(texto, sessao, bot, db, sessoes);
   }
 
   // Inicializar texto como string vazia se não definido

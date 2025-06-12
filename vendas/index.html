@@ -191,6 +191,7 @@
         <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
         <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
         <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+        <li><a href="conferencia.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Conferencia</span></a></li>
       </ul>
       <p class="menu-label">Logic Ice</p>
     </div>
@@ -641,10 +642,8 @@ function verComprovante(id) {
   }
       }
 
-      // Aprovar Pedido
-     async function aprovarPedido(id) {
+  async function aprovarPedido(id) {
   try {
-    // Desativa botão durante a requisição (opcional se tiver botão com id específico)
     const btn = document.querySelector(`#aprovar-btn-${id}`);
     if (btn) btn.disabled = true;
 
@@ -659,11 +658,13 @@ function verComprovante(id) {
       throw new Error(`Erro do servidor: ${erro}`);
     }
 
-    showNotification('Pedido aprovado e estoque atualizado com sucesso!', 'success');
-    atualizarPedidosPendentes(); // ou atualizarVendas() dependendo do contexto
+    showNotification('Pedido aprovado com sucesso!', 'success'); // Ajuste na mensagem
+    atualizarPedidosPendentes();
+    atualizarResumoPorStatus();
   } catch (err) {
     showNotification("Erro ao aprovar pedido: " + err.message, "danger");
   } finally {
+    const btn = document.querySelector(`#aprovar-btn-${id}`);
     if (btn) btn.disabled = false;
   }
 }
@@ -686,34 +687,36 @@ function verComprovante(id) {
       }
 
       // Atualizar Vendas (somente visualização)
-      async function atualizarVendas(filtros = {}) {
-        document.getElementById('loader').style.display = 'block';
-        try {
-          const query = new URLSearchParams(filtros).toString();
-          const response = await fetch(`/api/vendas?${query}`);
-          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-          const vendas = await response.json();
-          const tbody = document.getElementById('vendasTable');
-          tbody.innerHTML = '';
-          vendas.forEach(venda => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${venda.id}</td>
-              <td>${formatarCliente(venda.cliente_numero)}</td>
-              <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
-              <td>${venda.forma_pagamento}</td>
-              <td>${formatarData(venda.data)}</td>
-              <td>${venda.status}</td>
-            `;
-            tbody.appendChild(row);
-          });
-          if (vendas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
-          }
-        }  finally {
-          document.getElementById('loader').style.display = 'none';
-        }
-      }
+     async function atualizarVendas(filtros = {}) {
+  document.getElementById('loader').style.display = 'block';
+  try {
+    const query = new URLSearchParams(filtros).toString();
+    const response = await fetch(`/api/vendas?${query}`);
+    if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+    const { vendas } = await response.json();
+    const tbody = document.getElementById('vendasTable');
+    tbody.innerHTML = '';
+    vendas.forEach(venda => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${venda.id}</td>
+        <td>${formatarCliente(venda.cliente_numero)}</td>
+        <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
+        <td>${venda.forma_pagamento}</td>
+        <td>${formatarData(venda.data)}</td>
+        <td>${venda.status}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    if (vendas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
+    }
+  } catch (err) {
+    showNotification("Erro ao carregar vendas: " + err.message, "danger");
+  } finally {
+    document.getElementById('loader').style.display = 'none';
+  }
+}
 
       // Eventos
       document.addEventListener('DOMContentLoaded', () => {

@@ -8,6 +8,7 @@ const port = 3000;
 const usuariosPermitidos = ['usuario1', 'usuario2'];
 const cors = require('cors');
 app.use(cors());
+const bcrypt = require('bcrypt');
 
 const db = mysql.createPool({
   host: '127.0.0.1',
@@ -100,6 +101,7 @@ app.post('/alterar_status', async (req, res) => {
   }
 });
 
+// Corrigindo /enviar_para_entrega
 app.post('/enviar_para_entrega', async (req, res) => {
   try {
     const { rota } = req.body;
@@ -118,7 +120,7 @@ app.post('/enviar_para_entrega', async (req, res) => {
       await db.query(`
         INSERT INTO entregas
           (pedido_id, cliente_numero, itens, recebido, rota, data_pedido)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
       `, [
         pedido.id,
         pedido.cliente_numero,
@@ -128,16 +130,14 @@ app.post('/enviar_para_entrega', async (req, res) => {
         pedido.data
       ]);
     }
-    return res
-      .status(200)
-      .json({ mensagem: `Pedidos enviados para rota ${rota}. Total de pedidos: ${quantidade_pedidos}` });
+    res.status(200).json({ mensagem: `Pedidos enviados para rota ${rota}. Total de pedidos: ${quantidade_pedidos}` });
   } catch (erro) {
     console.error('Erro em /enviar_para_entrega:', erro);
-    return res
-      .status(500)
-      .json({ mensagem: 'Erro ao processar os pedidos para entrega.', erro: erro.message });
+    res.status(500).json({ mensagem: 'Erro ao processar os pedidos para entrega.', erro: erro.message });
   }
 });
+
+
 
 app.post('/mover', async (req, res) => {
   const { id, status } = req.body;
@@ -153,48 +153,116 @@ app.post('/mover', async (req, res) => {
 app.post('/valido', async (req, res) => {
   const { id, valido } = req.body;
 
+  // Validação inicial fora do try/catch
+  if (!id || isNaN(id)) {
+    return res.status(400).json({ erro: 'ID do pedido inválido' });
+  }
+
+  let conn;
   try {
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
     if (valido == 0) {
-      await db.query("UPDATE pedidos_diarios SET valido = ?, status = 'finalizado' WHERE id = ?", [valido, id]);
+      await conn.query("UPDATE pedidos_diarios SET valido = ?, status = 'finalizado' WHERE id = ?", [valido, id]);
+      await conn.commit();
       return res.sendStatus(200);
     }
 
-    // Baixa de estoque somente se validar (valido == 1)
-    const [itens] = await db.query(`
-      SELECT pi.produto_id, pi.quantidade, e.quantidade AS em_estoque
+    // Verificar se o pedido existe
+    const [pedido] = await conn.query("SELECT id FROM pedidos_diarios WHERE id = ?", [id]);
+    if (pedido.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ erro: 'Pedido não encontrado' });
+    }
+
+    // Verificar estoque para valido == 1
+    const [itens] = await conn.query(`
+      SELECT pi.produto_id, pi.quantidade, e.quantidade AS em_estoque, e.nome
       FROM pedido_itens pi
       JOIN estoque e ON pi.produto_id = e.id
       WHERE pi.pedido_id = ?
     `, [id]);
 
-    // Verifica se todos os itens têm estoque suficiente
+    // Verificar estoque suficiente
     for (const item of itens) {
       if (item.quantidade > item.em_estoque) {
-        return res.status(400).json({ erro: `Estoque insuficiente para o produto ${item.produto_id}` });
+        await conn.rollback();
+        return res.status(400).json({ erro: `Estoque insuficiente para o produto ${item.nome} (ID: ${item.produto_id})` });
       }
     }
 
-    // Faz a baixa
-    for (const item of itens) {
-      await db.query(`
-        UPDATE estoque SET quantidade = quantidade - ? WHERE id = ?
-      `, [item.quantidade, item.produto_id]);
-    }
+    // Atualizar apenas o pedido, sem mexer no estoque
+    await conn.query(
+      "UPDATE pedidos_diarios SET valido = ?, status = 'novo' WHERE id = ?",
+      [valido, id]
+    );
 
-    await db.query("UPDATE pedidos_diarios SET valido = ? WHERE id = ?", [valido, id]);
-
+    await conn.commit();
     res.sendStatus(200);
   } catch (err) {
+    if (conn) await conn.rollback();
     console.error("Erro ao atualizar validade do pedido:", err);
-    res.status(500).send("Erro interno ao atualizar validade.");
+    res.status(500).json({ erro: `Erro interno ao atualizar validade: ${err.message}` });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+// Rota para listar pedidos elegíveis para devolução
+app.get('/api/pedidos-devolucao', async (req, res) => {
+  try {
+    const { page = 1, limit = 10, data = null } = req.query;
+    const offset = (page - 1) * limit;
+    let query = `
+      SELECT 
+        pd.id,
+        pd.cliente_numero,
+        pd.status,
+        pd.recebido,
+        pd.data_hora AS data,
+        v.valor_total
+      FROM pedidos_diarios pd
+      LEFT JOIN vendas v ON pd.venda_id = v.id
+      WHERE pd.status IN ('incorreto', 'falha')
+    `;
+    const params = [];
+    if (data) {
+      query += ' AND DATE(pd.data_hora) = ?';
+      params.push(data);
+    }
+    query += ' ORDER BY pd.data_hora DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+
+    const [pedidos] = await db.query(query, params);
+
+    if (pedidos.length === 0) {
+      return res.status(200).json({ mensagem: 'Não existem devoluções disponíveis no momento.' });
+    }
+
+    const [[{ total }]] = await db.query(`
+      SELECT COUNT(*) as total
+      FROM pedidos_diarios pd
+      WHERE pd.status IN ('incorreto', 'falha')
+      ${data ? 'AND DATE(pd.data_hora) = ?' : ''}
+    `, data ? [data] : []);
+
+    res.status(200).json({
+      pedidos,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error('Erro ao buscar pedidos para devolução:', err);
+    res.status(500).json({ erro: 'Erro ao buscar pedidos para devolução' });
   }
 });
 
-
 app.post('/login', async (req, res) => {
   const { usuario, senha } = req.body;
-  const [usuarios] = await db.query("SELECT * FROM usuarios_web WHERE usuario = ? AND senha = ?", [usuario, senha]);
-  if (usuarios.length) {
+  const [usuarios] = await db.query("SELECT * FROM usuarios_web WHERE usuario = ?", [usuario]);
+  if (usuarios.length && await bcrypt.compare(senha, usuarios[0].senha)) {
     return res.json({ usuario: usuarios[0].usuario, permissao: usuarios[0].permissao });
   }
   res.status(401).send("Usuário ou senha inválidos");
@@ -237,6 +305,9 @@ app.get('/api/estoque/categorias', async (req, res) => {
 app.get('/api/vendas-por-cliente', async (req, res) => {
   try {
     const busca = req.query.busca || '';
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
     const params = busca ? [`%${busca}%`] : [];
     const query = `
       SELECT 
@@ -248,9 +319,23 @@ app.get('/api/vendas-por-cliente', async (req, res) => {
       ${busca ? 'WHERE cliente_numero LIKE ?' : ''}
       GROUP BY cliente_numero
       ORDER BY ultima_compra DESC
+      LIMIT ? OFFSET ?
     `;
+    const countQuery = `
+      SELECT COUNT(DISTINCT cliente_numero) as total
+      FROM vendas
+      ${busca ? 'WHERE cliente_numero LIKE ?' : ''}
+    `;
+    params.push(limit, offset);
     const [clientes] = await db.query(query, params);
-    res.json(clientes);
+    const [[{ total }]] = await db.query(countQuery, busca ? [`%${busca}%`] : []);
+    res.json({
+      clientes,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error('Erro ao buscar vendas por cliente:', err);
     res.status(500).json({ erro: 'Erro ao buscar vendas por cliente' });
@@ -422,19 +507,84 @@ app.get('/api/lancamentos', async (req, res) => {
 });
 // Rota para adicionar lançamento
 app.post('/api/lancamentos', async (req, res) => {
-  const { descricao, categoria, data_lancamento, tipo } = req.body;
+  const { descricao, categoria, data_lancamento, tipo, pedido_id, valor } = req.body;
+
+  // Validação básica
   if (!descricao || !data_lancamento) {
     return res.status(400).json({ erro: 'Descrição e data de lançamento são obrigatórios.' });
   }
+
+  // Se for uma devolução (identificada por pedido_id), forçar tipo e categoria
+  const finalTipo = pedido_id ? 'devolução' : (tipo || null);
+  const finalCategoria = pedido_id ? 'Outros' : (categoria || null);
+  const finalDescricao = pedido_id ? `Devolução - ${descricao}` : descricao;
+
+  const conn = await db.getConnection();
   try {
-    const [result] = await db.query(
-      'INSERT INTO lancamentos (descricao, categoria, data_lancamento, tipo) VALUES (?, ?, ?, ?)',
-      [descricao, categoria, data_lancamento, tipo]
+    await conn.beginTransaction();
+
+    // Inserir o lançamento
+    const [result] = await conn.query(
+      'INSERT INTO lancamentos (descricao, categoria, data_lancamento, tipo, pedido_id, valor) VALUES (?, ?, ?, ?, ?, ?)',
+      [finalDescricao, finalCategoria, data_lancamento, finalTipo, pedido_id || null, valor || null]
     );
+
+    // Se for uma devolução, atualizar status e estoque
+    if (pedido_id) {
+      // Verificar se o pedido existe
+      const [pedido] = await conn.query('SELECT id, status FROM pedidos_diarios WHERE id = ?', [pedido_id]);
+      if (pedido.length === 0) {
+        throw new Error('Pedido não encontrado.');
+      }
+
+      // Atualizar o status do pedido para "devolvido"
+      await conn.query('UPDATE pedidos_diarios SET status = ? WHERE id = ?', ['devolvido', pedido_id]);
+
+      // Obter os itens do pedido
+      const [itens] = await conn.query(
+        'SELECT pi.produto_id, pi.quantidade FROM pedido_itens pi WHERE pi.pedido_id = ?',
+        [pedido_id]
+      );
+
+      if (itens.length === 0) {
+        throw new Error('Nenhum item encontrado para o pedido.');
+      }
+
+      // Atualizar o estoque para cada item
+      for (const item of itens) {
+        const [estoque] = await conn.query('SELECT id, quantidade FROM estoque WHERE id = ?', [item.produto_id]);
+        if (estoque.length === 0) {
+          throw new Error(`Produto com ID ${item.produto_id} não encontrado no estoque.`);
+        }
+
+        await conn.query(
+          'UPDATE estoque SET quantidade = quantidade + ? WHERE id = ?',
+          [item.quantidade, item.produto_id]
+        );
+
+        // Opcional: Registrar log da movimentação de estoque
+        await conn.query(
+          'INSERT INTO lancamentos (descricao, categoria, tipo, data_lancamento, pedido_id, valor) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            `Retorno ao estoque: ${item.quantidade} unidades do produto ${item.produto_id}`,
+            'Estoque',
+            'entrada',
+            data_lancamento,
+            pedido_id,
+            null
+          ]
+        );
+      }
+    }
+
+    await conn.commit();
     res.json({ mensagem: 'Lançamento cadastrado com sucesso.', id: result.insertId });
   } catch (error) {
+    await conn.rollback();
     console.error('Erro ao adicionar lançamento:', error);
-    res.status(500).json({ erro: 'Erro ao adicionar lançamento' });
+    res.status(500).json({ erro: `Erro ao adicionar lançamento: ${error.message}` });
+  } finally {
+    conn.release();
   }
 });
 
@@ -733,6 +883,8 @@ app.get('/api/entregas', async (req, res) => {
   }
 });
 
+
+
 app.get('/api/entregadores', async (req, res) => {
   try {
     const [entregadores] = await db.query(`
@@ -749,22 +901,53 @@ app.get('/api/entregadores', async (req, res) => {
   }
 });
 
+app.post('/api/atualizar_valor_recebido', async (req, res) => {
+  const { id, valor_recebido } = req.body;
+
+  if (!id || !valor_recebido || valor_recebido < 0) {
+    return res.status(400).json({ erro: 'ID da venda e valor recebido são obrigatórios e devem ser válidos' });
+  }
+
+  try {
+    const [result] = await db.query(
+      'UPDATE vendas SET valor_pago = ? WHERE id = ?',
+      [parseFloat(valor_recebido), id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erro: 'Venda não encontrada' });
+    }
+
+    // Opcional: Registrar log da alteração
+    await db.query(
+      'INSERT INTO log_alteracoes (tabela, registro_id, acao, usuario_id, detalhes, data) VALUES (?, ?, ?, ?, ?, NOW())',
+      ['vendas', id, 'UPDATE', null, `Valor recebido atualizado para R$ ${valor_recebido}`]
+    );
+
+    res.json({ mensagem: 'Valor recebido atualizado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao atualizar valor recebido:', err);
+    res.status(500).json({ erro: 'Erro ao atualizar valor recebido' });
+  }
+});
+
 app.get('/api/vendas', async (req, res) => {
   try {
-    const { cliente_numero, data_inicio, data_fim, status } = req.query;
+    const { cliente_numero, data_inicio, data_fim, status, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
     const params = [];
     let whereClauses = [];
+
     if (cliente_numero) {
       whereClauses.push('v.cliente_numero LIKE ?');
       params.push(`%${cliente_numero}%`);
     }
     if (data_inicio) {
-  whereClauses.push('DATE(v.data) >= ?');
-  params.push(data_inicio);
-} else {
-  whereClauses.push('DATE(v.data) = CURDATE()');
-}
-
+      whereClauses.push('DATE(v.data) >= ?');
+      params.push(data_inicio);
+    } else {
+      whereClauses.push('DATE(v.data) = CURDATE()');
+    }
     if (data_fim) {
       whereClauses.push('DATE(v.data) <= ?');
       params.push(data_fim);
@@ -773,7 +956,9 @@ app.get('/api/vendas', async (req, res) => {
       whereClauses.push('v.status = ?');
       params.push(status);
     }
+
     const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    
     const query = `
       SELECT 
         v.id,
@@ -783,17 +968,39 @@ app.get('/api/vendas', async (req, res) => {
         COALESCE(v.data, NOW()) AS data,
         COALESCE(v.status, 'novo') AS status,
         v.comprovante IS NOT NULL AS tem_comprovante,
-        GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) AS produtos
+        GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) AS produtos,
+        COALESCE(e2.observacoes, '') AS motivo_falha,
+        COALESCE(e2.endereco, '') AS endereco
       FROM vendas v
       LEFT JOIN pedidos_diarios pd ON pd.venda_id = v.id
       LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
       LEFT JOIN estoque e ON pi.produto_id = e.id
+      LEFT JOIN entregas e2 ON e2.pedido_id = pd.id
       ${where}
       GROUP BY v.id
       ORDER BY v.data DESC
+      LIMIT ? OFFSET ?
     `;
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM vendas v
+      LEFT JOIN pedidos_diarios pd ON pd.venda_id = v.id
+      ${where}
+    `;
+    
+    params.push(parseInt(limit), parseInt(offset));
+    
     const [vendas] = await db.query(query, params);
-    res.json(vendas);
+    const [[{ total }]] = await db.query(countQuery, params.slice(0, -2)); // Remove limit e offset para contagem
+
+    res.json({
+      vendas,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error('Erro ao buscar vendas:', err);
     res.status(500).json({ erro: 'Erro ao buscar vendas' });
@@ -934,12 +1141,29 @@ app.patch('/api/vendas/:id', async (req, res) => {
 
 app.get('/api/usuarios_web', async (req, res) => {
   try {
-    const [usuarios] = await db.query(`
+    const { busca, page = 1, limit = 10 } = req.query;
+    if (page < 1 || limit < 1) {
+      return res.status(400).json({ erro: 'Parâmetros de página ou limite inválidos' });
+    }
+    const offset = (page - 1) * limit;
+    const params = busca ? [`%${busca}%`] : [];
+    const query = `
       SELECT id, usuario, permissao, data_criacao
       FROM usuarios_web
+      ${busca ? 'WHERE usuario LIKE ?' : ''}
       ORDER BY usuario
-    `);
-    res.json(usuarios);
+      LIMIT ? OFFSET ?
+    `;
+    params.push(parseInt(limit), parseInt(offset));
+    const [usuarios] = await db.query(query, params);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM usuarios_web' + (busca ? ' WHERE usuario LIKE ?' : ''), busca ? [`%${busca}%`] : []);
+    res.json({
+      usuarios,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error('Erro ao buscar usuários web:', err);
     res.status(500).json({ erro: 'Erro ao buscar usuários web' });
@@ -949,6 +1173,9 @@ app.get('/api/usuarios_web', async (req, res) => {
 app.get('/api/usuarios_web/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) {
+      return res.status(400).json({ erro: 'ID inválido' });
+    }
     const [usuarios] = await db.query(`
       SELECT id, usuario, permissao, data_criacao
       FROM usuarios_web
@@ -970,38 +1197,57 @@ app.post('/api/usuarios_web', async (req, res) => {
     if (!usuario || !senha || !permissao) {
       return res.status(400).json({ erro: 'Usuário, senha e permissão são obrigatórios' });
     }
+    const validPermissions = ['admin', 'vendas', 'producao'];
+    if (!validPermissions.includes(permissao)) {
+      return res.status(400).json({ erro: 'Permissão inválida' });
+    }
     const [existing] = await db.query('SELECT id FROM usuarios_web WHERE usuario = ?', [usuario]);
     if (existing.length > 0) {
       return res.status(400).json({ erro: 'Usuário já existe' });
     }
+    const hashedPassword = await bcrypt.hash(senha, 10);
     const [result] = await db.query(`
       INSERT INTO usuarios_web (usuario, senha, permissao, data_criacao)
       VALUES (?, ?, ?, NOW())
-    `, [usuario, senha, permissao]);
+    `, [usuario, hashedPassword, permissao]);
     res.status(201).json({ id: result.insertId, mensagem: 'Usuário web adicionado com sucesso' });
   } catch (err) {
     console.error('Erro ao adicionar usuário web:', err);
     res.status(500).json({ erro: 'Erro ao adicionar usuário web' });
   }
 });
-
 app.get('/api/usuarios', async (req, res) => {
   try {
-    const [usuarios] = await db.query(`
+    const { busca, page = 1, limit = 10 } = req.query;
+    if (page < 1 || limit < 1) {
+      return res.status(400).json({ erro: 'Parâmetros de página ou limite inválidos' });
+    }
+    const offset = (page - 1) * limit;
+    const params = busca ? [`%${busca}%`, `%${busca}%`] : [];
+    const query = `
       SELECT id, nome, numero, cargo, departamento, email, data_contratacao, salario, data_registro
       FROM usuarios
+      ${busca ? 'WHERE nome LIKE ? OR numero LIKE ?' : ''}
       ORDER BY nome
-    `);
-    res.json(usuarios);
+      LIMIT ? OFFSET ?
+    `;
+    params.push(parseInt(limit), parseInt(offset));
+    const [usuarios] = await db.query(query, params);
+    const [[{ total }]] = await db.query('SELECT COUNT(*) as total FROM usuarios' + (busca ? ' WHERE nome LIKE ? OR numero LIKE ?' : ''), busca ? [`%${busca}%`, `%${busca}%`] : []);
+    res.json({ usuarios, total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error('Erro ao buscar usuários:', err);
     res.status(500).json({ erro: 'Erro ao buscar usuários' });
   }
 });
 
+// GET /api/usuarios/:id
 app.get('/api/usuarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) {
+      return res.status(400).json({ erro: 'ID inválido' });
+    }
     const [usuarios] = await db.query(`
       SELECT id, nome, numero, cargo, departamento, email, data_contratacao, salario, data_registro
       FROM usuarios
@@ -1017,11 +1263,21 @@ app.get('/api/usuarios/:id', async (req, res) => {
   }
 });
 
+// POST /api/usuarios
 app.post('/api/usuarios', async (req, res) => {
   try {
     const { nome, numero, cargo, departamento, email, data_contratacao, salario } = req.body;
     if (!nome || !numero) {
       return res.status(400).json({ erro: 'Nome e número são obrigatórios' });
+    }
+    if (!/^\d{10,15}$/.test(numero)) {
+      return res.status(400).json({ erro: 'Número deve ter entre 10 e 15 dígitos' });
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ erro: 'Email inválido' });
+    }
+    if (data_contratacao && isNaN(new Date(data_contratacao).getTime())) {
+      return res.status(400).json({ erro: 'Data de contratação inválida' });
     }
     const [existing] = await db.query('SELECT id FROM usuarios WHERE numero = ?', [numero]);
     if (existing.length > 0) {
@@ -1041,9 +1297,21 @@ app.post('/api/usuarios', async (req, res) => {
 app.put('/api/usuarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) {
+      return res.status(400).json({ erro: 'ID inválido' });
+    }
     const { nome, numero, cargo, departamento, email, data_contratacao, salario } = req.body;
     if (!nome || !numero) {
       return res.status(400).json({ erro: 'Nome e número são obrigatórios' });
+    }
+    if (!/^\d{10,15}$/.test(numero)) {
+      return res.status(400).json({ erro: 'Número deve ter entre 10 e 15 dígitos' });
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ erro: 'Email inválido' });
+    }
+    if (data_contratacao && isNaN(new Date(data_contratacao).getTime())) {
+      return res.status(400).json({ erro: 'Data de contratação inválida' });
     }
     const [existing] = await db.query('SELECT id FROM usuarios WHERE id = ?', [id]);
     if (existing.length === 0) {
@@ -1288,9 +1556,16 @@ app.get('/api/despesas/relatorio', async (req, res) => {
 app.delete('/api/usuarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) {
+      return res.status(400).json({ erro: 'ID inválido' });
+    }
     const [existing] = await db.query('SELECT id FROM usuarios WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
+    }
+    const [dependencias] = await db.query('SELECT COUNT(*) as count FROM entregas WHERE entregador_id = ?', [id]);
+    if (dependencias[0].count > 0) {
+      return res.status(400).json({ erro: 'Usuário não pode ser deletado pois está associado a entregas' });
     }
     const [result] = await db.query('DELETE FROM usuarios WHERE id = ?', [id]);
     res.json({ mensagem: 'Usuário deletado com sucesso' });
@@ -1406,9 +1681,16 @@ app.get('/api/entregadores', async (req, res) => {
 app.put('/api/usuarios_web/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) {
+      return res.status(400).json({ erro: 'ID inválido' });
+    }
     const { usuario, senha, permissao } = req.body;
     if (!usuario || !senha || !permissao) {
       return res.status(400).json({ erro: 'Usuário, senha e permissão são obrigatórios' });
+    }
+    const validPermissions = ['admin', 'vendas', 'producao'];
+    if (!validPermissions.includes(permissao)) {
+      return res.status(400).json({ erro: 'Permissão inválida' });
     }
     const [existing] = await db.query('SELECT id FROM usuarios_web WHERE id = ?', [id]);
     if (existing.length === 0) {
@@ -1418,11 +1700,12 @@ app.put('/api/usuarios_web/:id', async (req, res) => {
     if (duplicate.length > 0) {
       return res.status(400).json({ erro: 'Novo nome de usuário já está em uso' });
     }
+    const hashedPassword = await bcrypt.hash(senha, 10);
     const [result] = await db.query(`
       UPDATE usuarios_web
       SET usuario = ?, senha = ?, permissao = ?
       WHERE id = ?
-    `, [usuario, senha, permissao, id]);
+    `, [usuario, hashedPassword, permissao, id]);
     res.json({ mensagem: 'Usuário web atualizado com sucesso' });
   } catch (err) {
     console.error('Erro ao atualizar usuário web:', err);
@@ -1433,6 +1716,9 @@ app.put('/api/usuarios_web/:id', async (req, res) => {
 app.delete('/api/usuarios_web/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (isNaN(id)) {
+      return res.status(400).json({ erro: 'ID inválido' });
+    }
     const [existing] = await db.query('SELECT id FROM usuarios_web WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ erro: 'Usuário web não encontrado' });

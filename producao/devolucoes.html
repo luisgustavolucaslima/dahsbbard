@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devoluções</title>
+  <link rel="stylesheet" href="css/main.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+  <style>
+    .table-container { max-height: 400px; overflow-y: auto; margin-top: 1rem; }
+    .table th, .table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+    .table th { background-color: #f3f4f6; position: sticky; top: 0; z-index: 10; }
+    .modal-card-body { max-height: 70vh; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav id="navbar-main" class="navbar is-fixed-top">
+      <div class="navbar-brand">
+        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+        </a>
+      </div>
+      <div class="navbar-brand is-right">
+        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+        </a>
+      </div>
+      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+        <div class="navbar-end">
+          <a title="Log out" class="navbar-item is-desktop-icon-only" href="../login.html">
+            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+    <aside class="aside is-placed-left is-expanded">
+      <div class="aside-tools">
+        <div class="aside-tools-label">
+          <span><b>Admin</b></span>
+        </div>
+      </div>
+     <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
+        <li><a href="producao.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Producao</span></a></li>
+        <li><a href="estoque.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="devolucoes.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Devoluções</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+    </div>
+    </aside>
+    <section class="section is-title-bar">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item">
+            <ul><li>Admin</li><li>devolucoes</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section is-main-section">
+      <div class="container">
+        <h1 class="title">Devoluções</h1>
+        <div class="card">
+          <header class="card-header">
+            <p class="card-header-title">Lista de Pedidos para Devolução</p>
+          </header>
+          <div class="card-content">
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped is-hoverable" id="devolucoesTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Status</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="devolucoesTableBody"></tbody>
+              </table>
+              <nav class="pagination is-centered" role="navigation" aria-label="pagination" style="margin-top: 1rem;">
+  <a class="pagination-previous">Anterior</a>
+  <a class="pagination-next">Próxima</a>
+  <span class="pagination-info" id="paginationInfo" style="margin-left: 1rem;"></span>
+</nav>
+
+            </div>
+          </div>
+     
+        </div>
+
+        <!-- Modal para Registrar Devolução -->
+        <div class="modal" id="registerDevolucaoModal">
+          <div class="modal-background"></div>
+          <div class="modal-card">
+            <header class="modal-card-head">
+              <p class="modal-card-title">Registrar Devolução</p>
+              <button class="delete" aria-label="close" onclick="closeRegisterModal()"></button>
+            </header>
+            <section class="modal-card-body">
+              <form id="registerDevolucaoForm">
+                <div class="field">
+                  <label class="label">ID do Pedido</label>
+                  <div class="control">
+                    <input class="input" type="text" id="devolucaoPedidoId" readonly>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Descrição</label>
+                  <div class="control">
+                    <input class="input" type="text" id="devolucaoDescricao" placeholder="Descreva a devolução" required>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Data</label>
+                  <div class="control">
+                    <input class="input" type="date" id="devolucaoData" required>
+                  </div>
+                </div>
+              </form>
+            </section>
+            <footer class="modal-card-foot">
+              <button class="button is-success" onclick="salvarDevolucao()">Registrar</button>
+              <button class="button" onclick="closeRegisterModal()">Cancelar</button>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let currentPage = 1;
+    let totalPages = 1;
+    const itemsPerPage = 10;
+
+    // Função para formatar datas
+    function formatarData(data) {
+      const d = new Date(data);
+      return d.toLocaleDateString('pt-BR');
+    }
+
+    // Função para notificação
+    function mostrarNotificacao(mensagem, tipo) {
+      const notificacao = document.createElement('div');
+      notificacao.className = `notification ${tipo} is-light`;
+      notificacao.style.position = 'fixed';
+      notificacao.style.top = '10px';
+      notificacao.style.right = '10px';
+      notificacao.style.zIndex = '1000';
+      notificacao.textContent = mensagem;
+      document.body.appendChild(notificacao);
+      setTimeout(() => notificacao.remove(), 3000);
+    }
+
+
+    // Função para atualizar lista de devoluções com paginação
+    async function atualizarDevolucoes(page = 1) {
+      if (page < 1 || page > totalPages) return;
+
+
+      const tbody = document.getElementById('devolucoesTableBody');
+      const prevButton = document.querySelector('.pagination-previous');
+      const nextButton = document.querySelector('.pagination-next');
+      const paginationInfo = document.getElementById('paginationInfo');
+
+      tbody.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+      try {
+        const response = await fetch(`/api/pedidos-devolucao?page=${page}&limit=${itemsPerPage}`, {
+          headers: { 'Accept': 'application/json'}
+        });
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = 'login.html';
+            return;
+          }
+          throw new Error('Erro ao carregar pedidos');
+        }
+        const data = await response.json();
+        tbody.innerHTML = '';
+        if (data.mensagem && data.mensagem === 'Não existem devoluções disponíveis no momento.') {
+          tbody.innerHTML = '<tr><td colspan="6">Não existem devoluções disponíveis no momento.</td></tr>';
+          totalPages = 1;
+        } else {
+          data.pedidos.forEach(pedido => {
+            if (pedido.recebido === 0 || pedido.status !== 'finalizado') {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${pedido.id}</td>
+                <td>${pedido.cliente_numero || '-'}</td>
+                <td>${pedido.status || '-'}</td>
+                <td>${formatarData(pedido.data)}</td>
+<td><button class="button is-small is-info" onclick="abrirRegisterModal(${pedido.id})">Registrar Devolução</button></td>
+
+              `;
+              tbody.appendChild(row);
+            }
+          });
+          totalPages = data.totalPages || 1;
+        }
+        currentPage = page;
+        prevButton.disabled = currentPage === 1;
+        nextButton.disabled = currentPage === totalPages;
+        paginationInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+      } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="6">Erro ao carregar pedidos</td></tr>';
+        mostrarNotificacao('Erro ao carregar pedidos: ' + error.message, 'is-danger');
+      }
+    }
+
+    // Função para abrir modal de registro
+    function abrirRegisterModal(pedidoId) {
+      const modal = document.getElementById('registerDevolucaoModal');
+      modal.classList.add('is-active');
+      document.getElementById('devolucaoPedidoId').value = pedidoId;
+      document.getElementById('devolucaoData').valueAsDate = new Date();
+    }
+
+    // Função para fechar modal
+    function closeRegisterModal() {
+      const modal = document.getElementById('registerDevolucaoModal');
+      modal.classList.remove('is-active');
+      document.getElementById('registerDevolucaoForm').reset();
+    }
+
+    // Função para salvar devolução
+    async function salvarDevolucao() {
+      const form = document.getElementById('registerDevolucaoForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+
+      const devolucao = {
+        pedido_id: document.getElementById('devolucaoPedidoId').value,
+        descricao: document.getElementById('devolucaoDescricao').value,
+        data_lancamento: document.getElementById('devolucaoData').value
+      };
+
+      try {
+        const response = await fetch('/api/lancamentos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(devolucao)
+        });
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = 'login.html';
+            return;
+          }
+          throw new Error('Erro ao registrar devolução');
+        }
+        mostrarNotificacao('Devolução registrada com sucesso!', 'is-success');
+        closeRegisterModal();
+        atualizarDevolucoes(currentPage);
+      } catch (error) {
+        mostrarNotificacao('Erro ao registrar devolução: ' + error.message, 'is-danger');
+      }
+    }
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', () => {
+       atualizarDevolucoes();
+
+  document.querySelector('.pagination-previous').addEventListener('click', () => {
+    if (currentPage > 1) atualizarDevolucoes(currentPage - 1);
+  });
+
+  document.querySelector('.pagination-next').addEventListener('click', () => {
+    if (currentPage < totalPages) atualizarDevolucoes(currentPage + 1);
+  });
+    });
+  </script>
+  
+</body>
+</html>

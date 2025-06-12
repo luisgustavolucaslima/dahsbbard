@@ -11,7 +11,7 @@ const tratarVendas = require('./setores/vendas');
 
 // Configurações de timeout
 const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutos
-const MESSAGE_TIMEOUT = 300000; // 5 minutos
+const MESSAGE_TIMEOUT = 100000; // 5 minutos
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const db = mysql.createPool({
@@ -502,7 +502,7 @@ bot.on('callback_query', async (query) => {
   try {
     if (sessao.setor === 'vendas' && sessao.autenticado) {
       bot.answerCallbackQuery(query.id);
-      return await tratarVendas(query, { chat: { id: chatId } }, sessao, db, bot, enviarMensagem);
+      return await tratarVendas(query, { chat: { id: chatId } }, sessao, db, bot, sessoes, enviarMensagem);
     }
     if (sessao.setor === 'entrega' && sessao.autenticado) {
   console.log(`[DEBUG] Delegando callback ${data} para tratarEntrega`);
