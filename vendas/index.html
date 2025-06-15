@@ -185,16 +185,16 @@
           </div>
         </div>
        <div class="menu is-menu-main">
-      <p class="menu-label">Geral</p>
-      <ul class="menu-list">
+        <p class="menu-label">Geral</p>
+        <ul class="menu-list">
         <li><a href="index.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
         <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
         <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
         <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
         <li><a href="conferencia.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Conferencia</span></a></li>
-      </ul>
-      <p class="menu-label">Logic Ice</p>
-    </div>
+        </ul>
+       <p class="menu-label">Logic Ice</p>
+        </div>
       </aside>
       <section class="section is-title-bar">
         <div class="level">
@@ -517,12 +517,6 @@ function verComprovante(id) {
           if (!forma) {
             showNotification("Escolha uma forma de pagamento.", "warning");
             return;
-          } async function salvarPagamento() {
-          const forma = document.getElementById("formaPagamentoInput").value;
-
-          if (!forma) {
-            showNotification("Escolha uma forma de pagamento.", "warning");
-            return;
           }
 
           try {
@@ -540,7 +534,7 @@ function verComprovante(id) {
           } catch (error) {
             showNotification("Erro ao atualizar pagamento: " + error.message, "danger");
           }
-        }
+        
 
 
           try {
@@ -687,36 +681,47 @@ function verComprovante(id) {
       }
 
       // Atualizar Vendas (somente visualização)
-     async function atualizarVendas(filtros = {}) {
-  document.getElementById('loader').style.display = 'block';
-  try {
-    const query = new URLSearchParams(filtros).toString();
-    const response = await fetch(`/api/vendas?${query}`);
-    if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-    const { vendas } = await response.json();
-    const tbody = document.getElementById('vendasTable');
-    tbody.innerHTML = '';
-    vendas.forEach(venda => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${venda.id}</td>
-        <td>${formatarCliente(venda.cliente_numero)}</td>
-        <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
-        <td>${venda.forma_pagamento}</td>
-        <td>${formatarData(venda.data)}</td>
-        <td>${venda.status}</td>
-      `;
-      tbody.appendChild(row);
-    });
-    if (vendas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
-    }
-  } catch (err) {
-    showNotification("Erro ao carregar vendas: " + err.message, "danger");
-  } finally {
-    document.getElementById('loader').style.display = 'none';
-  }
-}
+        async function atualizarVendas(filtros = {}) {
+          document.getElementById('loader').style.display = 'block';
+          try {
+            filtros.page = filtros.page || 1;
+            filtros.limit = 10;
+            const query = new URLSearchParams(filtros).toString();
+            const response = await fetch(`/api/vendas?${query}`);
+            if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
+            const { vendas, total, page, totalPages } = await response.json();
+            const tbody = document.getElementById('vendasTable');
+            tbody.innerHTML = '';
+            vendas.forEach(venda => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${venda.id}</td>
+                <td>${formatarCliente(venda.cliente_numero)}</td>
+                <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
+                <td>${venda.forma_pagamento}</td>
+                <td>${formatarData(venda.data)}</td>
+                <td>${venda.status}</td>
+              `;
+              tbody.appendChild(row);
+            });
+            if (vendas.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="6" class="has-text-centered">Nenhuma venda encontrada</td></tr>';
+            }
+            // Adicione navegação de página
+            const nav = document.createElement('nav');
+            nav.className = 'pagination';
+            nav.innerHTML = `
+              <a class="pagination-previous" ${page === 1 ? 'disabled' : ''} onclick="atualizarVendas({ ...filtros, page: ${page - 1} })">Anterior</a>
+              <a class="pagination-next" ${page >= totalPages ? 'disabled' : ''} onclick="atualizarVendas({ ...filtros, page: ${page + 1} })">Próxima</a>
+              <span class="is-size-7">Página ${page} de ${totalPages} (${total} vendas)</span>
+            `;
+            tbody.parentElement.parentElement.appendChild(nav);
+          } catch (err) {
+            showNotification("Erro ao carregar vendas: " + err.message, "danger");
+          } finally {
+            document.getElementById('loader').style.display = 'none';
+          }
+        }
 
       // Eventos
       document.addEventListener('DOMContentLoaded', () => {
@@ -1007,7 +1012,7 @@ function fecharModalConfirmacao() {
               <option value="">Selecione</option>
               <option value="pix">PIX</option>
               <option value="dinheiro">Dinheiro</option>
-              <option value="pix e dinheiro">Pix e Dinheiro</option>
+              <option value="pix+dinheiro">Pix + Dinheiro</option>
             </select>
           </div>
         </div>

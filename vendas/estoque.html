@@ -74,15 +74,16 @@
       </div>
     </div>
     <div class="menu is-menu-main">
-      <p class="menu-label">Geral</p>
-      <ul class="menu-list">
-        <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <p class="menu-label">Geral</p>
+        <ul class="menu-list">
+        <li><a href="index.html" class=" has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
         <li><a href="estoque.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
         <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
         <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
-      </ul>
-      <p class="menu-label">Logic Ice</p>
-    </div>
+        <li><a href="conferencia.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Conferencia</span></a></li>
+        </ul>
+       <p class="menu-label">Logic Ice</p>
+        </div>
   </aside>
   <section class="section is-title-bar">
     <div class="level">
@@ -503,29 +504,28 @@ mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
 }
 
 async function confirmarBaixaEstoque() {
-  const id = document.getElementById('selectBaixaEstoque').value;
-  const quantidade = parseInt(document.getElementById('quantidadeBaixaEstoque').value);
-  const descricao = document.getElementById('descricaoBaixaEstoque').value;
-
-  if (!id || quantidade <= 0 || !descricao) {
-     mostrarNotificacao('Preencha todos os campos corretamente.', 'is-danger');
-    return;
-  }
-
-  const res = await fetch('/api/estoque/saida', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, quantidade, descricao })
+  abrirModalConfirmacao('Confirmar baixa de estoque?', async () => {
+    const id = document.getElementById('selectBaixaEstoque').value;
+    const quantidade = parseInt(document.getElementById('quantidadeBaixaEstoque').value);
+    const descricao = document.getElementById('descricaoBaixaEstoque').value;
+    if (!id || quantidade <= 0 || !descricao) {
+      mostrarNotificacao('Preencha todos os campos corretamente.', 'is-danger');
+      return;
+    }
+    const res = await fetch('/api/estoque/saida', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, quantidade, descricao })
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      mostrarNotificacao(result.erro || 'Erro na baixa', 'is-danger');
+      return;
+    }
+    mostrarNotificacao('Baixa registrada com sucesso!', 'is-success');
+    fecharModalBaixaEstoque();
+    atualizarEstoque();
   });
-
-  const result = await res.json();
-  if (!res.ok) {
-     mostrarNotificacao(result.erro || 'Erro na baixa');
-    return;
-  }
-mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
-  fecharModalBaixaEstoque();
-  atualizarEstoque();
 }
 
 // Função de notificação com Bulma (melhorada)

@@ -591,6 +591,12 @@
       return;
     }
 
+    const valor = parseFloat(document.getElementById('registerValor')?.value);
+      if (valor && (valor <= 0 || isNaN(valor))) {
+        mostrarNotificacao('O valor deve ser positivo.', 'is-warning');
+        return;
+      }
+
     try {
       const response = await fetch('http://localhost:3000/api/lancamentos', {
         method: 'POST',
@@ -673,6 +679,8 @@
       mostrarNotificacao('Erro ao atualizar lançamento: ' + error.message, 'is-danger');
     }
   }
+
+  
 
   // Função para confirmar deleção
   function confirmarDelecaoRegistro() {

@@ -510,29 +510,28 @@ mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
 }
 
 async function confirmarBaixaEstoque() {
-  const id = document.getElementById('selectBaixaEstoque').value;
-  const quantidade = parseInt(document.getElementById('quantidadeBaixaEstoque').value);
-  const descricao = document.getElementById('descricaoBaixaEstoque').value;
-
-  if (!id || quantidade <= 0 || !descricao) {
-     mostrarNotificacao('Preencha todos os campos corretamente.', 'is-danger');
-    return;
-  }
-
-  const res = await fetch('/api/estoque/saida', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, quantidade, descricao })
+  abrirModalConfirmacao('Confirmar baixa de estoque?', async () => {
+    const id = document.getElementById('selectBaixaEstoque').value;
+    const quantidade = parseInt(document.getElementById('quantidadeBaixaEstoque').value);
+    const descricao = document.getElementById('descricaoBaixaEstoque').value;
+    if (!id || quantidade <= 0 || !descricao) {
+      mostrarNotificacao('Preencha todos os campos corretamente.', 'is-danger');
+      return;
+    }
+    const res = await fetch('/api/estoque/saida', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, quantidade, descricao })
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      mostrarNotificacao(result.erro || 'Erro na baixa', 'is-danger');
+      return;
+    }
+    mostrarNotificacao('Baixa registrada com sucesso!', 'is-success');
+    fecharModalBaixaEstoque();
+    atualizarEstoque();
   });
-
-  const result = await res.json();
-  if (!res.ok) {
-     mostrarNotificacao(result.erro || 'Erro na baixa');
-    return;
-  }
-mostrarNotificacao('Item atualizado com sucesso!', 'is-success');
-  fecharModalBaixaEstoque();
-  atualizarEstoque();
 }
 
 // Função de notificação com Bulma (melhorada)

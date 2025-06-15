@@ -22,7 +22,7 @@ const sendMessage = async (chatId, mensagem, bot, options = {}) => {
       } catch (err) {
         console.error(`[ERROR] Failed to delete message ${sentMessage.message_id}:`, err.message);
       }
-    }, 900000); // 30 seconds
+    }, 1200000); // 30 seconds
     return sentMessage;
   } catch (err) {
     console.error(`[ERROR] Failed to send message to ${chatId}:`, err.message);

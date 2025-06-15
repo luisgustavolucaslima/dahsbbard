@@ -78,18 +78,20 @@ async function tratarEntrega(texto, msg, sessao, db, bot, chatId, sessoes, envia
 // Função auxiliar para verificar estado do entregador
 async function checkDeliveryStatus(db, usuarioId) {
   const [pedidosPendentes] = await db.query(`
-    SELECT e.id
+    SELECT e.id, e.cliente_numero
     FROM entregas e
     JOIN pedidos_diarios p ON e.pedido_id = p.id
     WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
   `, [usuarioId]);
   const [rotaAtiva] = await db.query(`
-    SELECT id FROM rotas_salvas WHERE entregador_id = ? AND hora_fim IS NULL LIMIT 1
+    SELECT id, quantidade_pedidos FROM entregador WHERE entregador_id = ? AND hora_fim IS NULL LIMIT 1
   `, [usuarioId]);
   return {
     hasPendingDeliveries: pedidosPendentes.length > 0,
     hasActiveRoute: rotaAtiva.length > 0,
-    pendingCount: pedidosPendentes.length
+    pendingCount: pedidosPendentes.length,
+    activeRouteId: rotaAtiva.length > 0 ? rotaAtiva[0].id : null,
+    pendingDeliveries: pedidosPendentes // Retorna a lista de pedidos pendentes
   };
 }
 
@@ -183,11 +185,17 @@ if ((texto === 'submenu_pedidos' || (msg && msg.data === 'submenu_pedidos')) &&
     return;
   }
 
-  // Iniciar Rota
+// Iniciar Rota
 if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
+  if (msg && msg.data) await bot.answerCallbackQuery(msg.id);
   console.log(`[DEBUG] Iniciando ou reabrindo rota para chatId=${chatId}, usuario_id=${sessaoAtual.usuario_id}`);
   try {
     await db.query('START TRANSACTION');
+
+    // Validar usuario_id
+    if (!sessaoAtual.usuario_id) {
+      throw new Error('ID do usuário não definido na sessão');
+    }
 
     // Verificar pedidos pendentes em entregas
     const [pedidosPendentes] = await db.query(`
@@ -201,16 +209,34 @@ if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
 
     // Verificar rotas abertas em entregador
     const [rotasAbertas] = await db.query(`
-      SELECT id, quantidade_pedidos FROM entregador WHERE entregador = ? AND hora_fim IS NULL LIMIT 1
-    `, [sessaoAtual.nome || 'Entregador Desconhecido']);
+      SELECT id, quantidade_pedidos FROM entregador WHERE entregador_id = ? AND hora_fim IS NULL LIMIT 1
+    `, [sessaoAtual.usuario_id]);
     console.log(`[DEBUG] Rotas abertas em entregador: ${rotasAbertas.length}`);
 
     if (pedidosPendentes.length > 0) {
-      // Rota ativa com pedidos pendentes, reabrir
+      // Existem pedidos pendentes, reutilizar ou criar registro em entregador
+      let entregadorRotaId = rotasAbertas.length > 0 ? rotasAbertas[0].id : null;
+
+      if (!entregadorRotaId) {
+        // Não há rota ativa, criar novo registro em entregador
+        const [[usuario]] = await db.query('SELECT nome FROM usuarios WHERE id = ?', [sessaoAtual.usuario_id]);
+        const nomeEntregador = usuario?.nome || 'Entregador Desconhecido';
+
+        const [result] = await db.query(`
+          INSERT INTO entregador (entregador, quantidade_pedidos, hora_inicio, create_at, entregador_id)
+          VALUES (?, ?, NOW(), NOW(), ?)
+        `, [nomeEntregador, pedidosPendentes.length, sessaoAtual.usuario_id]);
+        entregadorRotaId = result.insertId;
+        console.log(`[INFO] Registro criado na tabela entregador: id=${entregadorRotaId}`);
+      } else {
+        console.log(`[INFO] Reutilizando registro ativo na tabela entregador: id=${entregadorRotaId}`);
+      }
+
+      // Configurar sessão para rota ativa
       sessaoAtual.rotaAtiva = true;
       sessaoAtual.etapa = 'aguardando_ponto_inicial';
       sessaoAtual.submenu = 'organizar_rota';
-      sessaoAtual.entregadorRotaId = rotasAbertas.length > 0 ? rotasAbertas[0].id : null;
+      sessaoAtual.entregadorRotaId = entregadorRotaId;
       sessaoAtual.pedidoId = null;
       sessaoAtual.pontoInicial = null;
       sessaoAtual.locations = pedidosPendentes.map(p => ({
@@ -236,8 +262,9 @@ if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
       return;
     }
 
-    // Não há pedidos pendentes, fechar rotas antigas e iniciar nova
+    // Não há pedidos pendentes
     if (rotasAbertas.length > 0) {
+      // Fechar rotas abertas sem pedidos pendentes
       console.log(`[INFO] Fechando rotas antigas para entregador_id=${sessaoAtual.usuario_id}`);
       await db.query(`
         UPDATE entregador
@@ -248,10 +275,11 @@ if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
 
     // Buscar pedidos atribuídos ao entregador com status 'rua'
     const [pedidos] = await db.query(`
-      SELECT e.id, e.pedido_id
+      SELECT e.id, e.pedido_id, e.cliente_numero, e.endereco, e.latitude, e.longitude, p.venda_id
       FROM entregas e
       JOIN pedidos_diarios p ON e.pedido_id = p.id
       WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+      ORDER BY e.id
     `, [sessaoAtual.usuario_id]);
     console.log(`[INFO] Pedidos disponíveis para iniciar rota: ${pedidos.length}, IDs: ${pedidos.map(p => p.id).join(', ')}`);
 
@@ -263,26 +291,30 @@ if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
       return;
     }
 
-    // Obter nome do entregador
+    // Criar novo registro na tabela entregador para os pedidos encontrados
     const [[usuario]] = await db.query('SELECT nome FROM usuarios WHERE id = ?', [sessaoAtual.usuario_id]);
     const nomeEntregador = usuario?.nome || 'Entregador Desconhecido';
 
-    // Criar registro na tabela entregador
     const [result] = await db.query(`
-      INSERT INTO entregador (entregador, quantidade_pedidos, hora_inicio, create_at)
-      VALUES (?, ?, NOW(), NOW())
-    `, [nomeEntregador, pedidos.length]);
+      INSERT INTO entregador (entregador, quantidade_pedidos, hora_inicio, create_at, entregador_id)
+      VALUES (?, ?, NOW(), NOW(), ?)
+    `, [nomeEntregador, pedidos.length, sessaoAtual.usuario_id]);
     const entregadorRotaId = result.insertId;
     console.log(`[INFO] Registro criado na tabela entregador: id=${entregadorRotaId}`);
 
-    // Armazenar o ID do registro na sessão
+    // Configurar sessão para nova rota
     sessaoAtual.entregadorRotaId = entregadorRotaId;
     sessaoAtual.rotaAtiva = true;
     sessaoAtual.etapa = 'aguardando_ponto_inicial';
     sessaoAtual.submenu = 'organizar_rota';
     sessaoAtual.pedidoId = null;
     sessaoAtual.pontoInicial = null;
-    sessaoAtual.locations = [];
+    sessaoAtual.locations = pedidos.map(p => ({
+      id: p.id,
+      address: p.endereco || 'Endereço não especificado',
+      latitude: p.latitude || null,
+      longitude: p.longitude || null
+    }));
     sessoes.set(chatId, sessaoAtual);
 
     // Atualizar as entregas com hora_inicio e data_saida
@@ -303,7 +335,7 @@ if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
     await db.query('COMMIT');
 
     // Listar pedidos para nova rota
-    const lista = pedidos.map(p => `📦 Entrega #${p.id}`).join('\n\n');
+    const lista = pedidos.map(p => `📦 Entrega #${p.id}\n📞 ${p.cliente_numero}\n📍 ${p.endereco || 'Endereço não especificado'}`).join('\n\n');
     await enviarMensagem(chatId, `🚚 *Rota iniciada com ${pedidos.length} pedido(s):*\n\n${lista}\n\n📍 *Envie sua localização para definir o ponto inicial da rota.*`, {
       reply_markup: {
         inline_keyboard: [
@@ -328,79 +360,81 @@ if (texto === 'iniciar_rota' || (msg && msg.data === 'iniciar_rota')) {
   return;
 }
 
-  // Finalizar Rota
-  if (texto === 'finalizar_rota' || (msg && msg.data === 'finalizar_rota')) {
-    if (!sessaoAtual.rotaAtiva) {
-      await enviarMensagem(chatId, '⚠️ *Nenhuma rota ativa para finalizar.*', {
+// Finalizar Rota
+if (texto === 'finalizar_rota' || (msg && msg.data === 'finalizar_rota')) {
+  if (msg && msg.data) await bot.answerCallbackQuery(msg.id);
+  if (!sessaoAtual.rotaAtiva) {
+    await enviarMensagem(chatId, '⚠️ *Nenhuma rota ativa para finalizar.*', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+    return;
+  }
+
+  try {
+    await db.query('START TRANSACTION');
+
+    // Verificar se há pedidos pendentes
+    const [pedidosPendentes] = await db.query(`
+      SELECT e.id, e.cliente_numero
+      FROM entregas e
+      JOIN pedidos_diarios p ON e.pedido_id = p.id
+      WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
+    `, [sessaoAtual.usuario_id]);
+    console.log(`[INFO] Pedidos pendentes ao finalizar rota: ${pedidosPendentes.length}`);
+
+    if (pedidosPendentes.length > 0) {
+      const listaPendentes = pedidosPendentes.map(p => `📦 Entrega #${p.id} - Cliente: ${p.cliente_numero}`).join('\n');
+      await db.query('COMMIT');
+      await enviarMensagem(chatId, `⚠️ *Existem pedidos pendentes que não foram entregues:*\n\n${listaPendentes}\n\nFinalize ou marque-os como falha antes de encerrar a rota.`, {
         reply_markup: getSubmenuOrganizarRota()
       });
       return;
     }
 
-    try {
-      await db.query('START TRANSACTION');
+    // Atualizar entregas para status 'finalizado'
+    await db.query(`
+      UPDATE entregas
+      SET hora_fim = CURRENT_TIME(), status = 'finalizado'
+      WHERE entregador_id = ? AND status = 'rua'
+    `, [sessaoAtual.usuario_id]);
 
-      // Verificar se há pedidos pendentes
-      const [pedidosPendentes] = await db.query(`
-        SELECT e.id, e.cliente_numero
-        FROM entregas e
-        JOIN pedidos_diarios p ON e.pedido_id = p.id
-        WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
-      `, [sessaoAtual.usuario_id]);
-      console.log(`[INFO] Pedidos pendentes ao finalizar rota: ${pedidosPendentes.length}`);
+    // Atualizar pedidos_diarios
+    await db.query(`
+      UPDATE pedidos_diarios p
+      JOIN entregas e ON p.id = e.pedido_id
+      SET p.status = 'finalizado'
+      WHERE e.entregador_id = ? AND e.status = 'finalizado'
+    `, [sessaoAtual.usuario_id]);
 
-      if (pedidosPendentes.length > 0) {
-        const listaPendentes = pedidosPendentes.map(p => `📦 Entrega #${p.id} - Cliente: ${p.cliente_numero}`).join('\n');
-        await db.query('COMMIT');
-        await enviarMensagem(chatId, `⚠️ *Existem pedidos pendentes que não foram entregues:*\n\n${listaPendentes}\n\nFinalize ou marque-os como falha antes de encerrar a rota.`, {
-          reply_markup: getSubmenuOrganizarRota()
-        });
-        return;
-      }
+    // Atualizar registro na tabela entregador com tempo médio por pedido
+    await db.query(`
+      UPDATE entregador
+      SET hora_fim = NOW(),
+          tempo_medio = TIMEDIFF(NOW(), hora_inicio),
+          tempo_medio_por_pedido = SEC_TO_TIME(TIME_TO_SEC(TIMEDIFF(NOW(), hora_inicio)) / quantidade_pedidos)
+      WHERE id = ? AND quantidade_pedidos > 0
+    `, [sessaoAtual.entregadorRotaId]);
 
-      // Atualizar entregas para status 'finalizado'
-      await db.query(`
-        UPDATE entregas
-        SET hora_fim = CURRENT_TIME(), status = 'finalizado'
-        WHERE entregador_id = ? AND status = 'rua'
-      `, [sessaoAtual.usuario_id]);
+    await db.query('COMMIT');
 
-      // Atualizar pedidos_diarios
-      await db.query(`
-        UPDATE pedidos_diarios p
-        JOIN entregas e ON p.id = e.pedido_id
-        SET p.status = 'finalizado'
-        WHERE e.entregador_id = ? AND e.status = 'finalizado'
-      `, [sessaoAtual.usuario_id]);
+    sessaoAtual.rotaAtiva = false;
+    sessaoAtual.entregadorRotaId = null;
+    sessaoAtual.etapa = 'submenu_organizar_rota';
+    sessaoAtual.submenu = 'organizar_rota';
+    sessoes.set(chatId, sessaoAtual);
 
-      // Atualizar registro na tabela entregador
-      await db.query(`
-        UPDATE entregador
-        SET hora_fim = NOW(),
-            tempo_medio = TIMEDIFF(NOW(), hora_inicio)
-        WHERE id = ?
-      `, [sessaoAtual.entregadorRotaId]);
-
-      await db.query('COMMIT');
-
-      sessaoAtual.rotaAtiva = false;
-      sessaoAtual.entregadorRotaId = null;
-      sessaoAtual.etapa = 'submenu_organizar_rota';
-      sessaoAtual.submenu = 'organizar_rota';
-      sessoes.set(chatId, sessaoAtual);
-
-      await enviarMensagem(chatId, '✅ *Rota finalizada com sucesso! Todos os pedidos foram processados.*', {
-        reply_markup: getSubmenuOrganizarRota()
-      });
-    } catch (err) {
-      await db.query('ROLLBACK');
-      console.error(`[ERROR] Erro ao finalizar rota: ${err.message}`);
-      await enviarMensagem(chatId, '⚠️ *Erro ao finalizar a rota. Tente novamente.*', {
-        reply_markup: getSubmenuOrganizarRota()
-      });
-    }
-    return;
+    await enviarMensagem(chatId, '✅ *Rota finalizada com sucesso! Todos os pedidos foram processados.*', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error(`[ERROR] Erro ao finalizar rota: ${err.message}`);
+    await enviarMensagem(chatId, '⚠️ *Erro ao finalizar a rota. Tente novamente.*', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
   }
+  return;
+}
 
   // 📋 Lista de pedidos válidos
   if (texto === 'lista' || (msg && msg.data === 'lista')) {
@@ -600,12 +634,13 @@ async function verificarFinalizarRotaAutomaticamente(chatId, sessao, db, enviarM
       console.log(`[DEBUG] Todos os pedidos finalizados, finalizando rota automaticamente para chatId=${chatId}`);
       await db.query('START TRANSACTION');
 
-      // Atualizar registro na tabela entregador
+      // Atualizar registro na tabela entregador com tempo médio por pedido
       await db.query(`
         UPDATE entregador
         SET hora_fim = NOW(),
-            tempo_medio = TIMEDIFF(NOW(), hora_inicio)
-        WHERE id = ?
+            tempo_medio = TIMEDIFF(NOW(), hora_inicio),
+            tempo_medio_por_pedido = SEC_TO_TIME(TIME_TO_SEC(TIMEDIFF(NOW(), hora_inicio)) / quantidade_pedidos)
+        WHERE id = ? AND quantidade_pedidos > 0
       `, [sessao.entregadorRotaId]);
 
       await db.query('COMMIT');

@@ -11,7 +11,7 @@ const tratarVendas = require('./setores/vendas');
 
 // Configurações de timeout
 const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutos
-const MESSAGE_TIMEOUT = 100000; // 5 minutos
+const CLEANUP_INTERVAL = 20 * 60 * 1000; // 20 minutos
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const db = mysql.createPool({
@@ -39,8 +39,8 @@ const verificarPermissoes = async (chatId) => {
   }
 };
 
-// Função para enviar mensagem com timeout de exclusão
-const enviarMensagem = async (chatId, mensagem, options = {}, persistente = false) => {
+// Função para enviar mensagem com rastreamento
+const enviarMensagem = async (chatId, mensagem, options = {}) => {
   try {
     if (!chatId || !mensagem) {
       console.error('[ERROR] Parâmetros inválidos para enviarMensagem:', { chatId, mensagem });
@@ -51,38 +51,10 @@ const enviarMensagem = async (chatId, mensagem, options = {}, persistente = fals
     sessao.messageIds = sessao.messageIds || [];
     sessao.messageIds.push(sentMessage.message_id);
     sessoes.set(chatId, sessao);
-    if (!persistente && !options.reply_markup?.inline_keyboard) {
-      setTimeout(async () => {
-        try {
-          await bot.deleteMessage(chatId, sentMessage.message_id);
-          console.log(`[DEBUG] Mensagem ${sentMessage.message_id} deletada após ${MESSAGE_TIMEOUT}ms`);
-        } catch (err) {
-          console.error(`[ERROR] Erro ao deletar mensagem ${sentMessage.message_id}:`, err.message);
-        }
-      }, MESSAGE_TIMEOUT);
-    }
+    console.log(`[DEBUG] Mensagem ${sentMessage.message_id} enviada para chatId=${chatId}`);
     return sentMessage;
   } catch (err) {
     console.error(`[ERROR] Erro ao enviar mensagem para ${chatId}:`, err.message);
-    return null;
-  }
-};
-
-// Função para enviar mensagem persistente (sem deleção)
-const enviarMensagemPersistente = async (chatId, mensagem, options = {}) => {
-  try {
-    if (!chatId || !mensagem) {
-      console.error('[ERROR] Parâmetros inválidos para enviarMensagemPersistente:', { chatId, mensagem });
-      return null;
-    }
-    const sentMessage = await bot.sendMessage(chatId, mensagem, { parse_mode: 'Markdown', ...options });
-    const sessao = sessoes.get(chatId) || { messageIds: [] };
-    sessao.messageIds = sessao.messageIds || [];
-    sessao.messageIds.push(sentMessage.message_id);
-    sessoes.set(chatId, sessao);
-    return sentMessage;
-  } catch (err) {
-    console.error(`[ERROR] Erro ao enviar mensagem persistente para ${chatId}:`, err.message);
     return null;
   }
 };
@@ -141,23 +113,17 @@ const solicitarNumeroTelefone = async (chatId) => {
   }
 };
 
-// Função para limpar mensagens do chat
+// Função para limpar mensagens de um chat
 const limparMensagensChat = async (chatId) => {
   try {
-    console.log(`[DEBUG] Iniciando limpeza de mensagens para chatId: ${chatId}`);
     const sessao = sessoes.get(chatId) || { messageIds: [] };
     sessao.messageIds = sessao.messageIds || [];
-    const tempMessage = await bot.sendMessage(chatId, '🧹 Iniciando limpeza...', { parse_mode: 'Markdown' });
-    sessao.messageIds.push(tempMessage.message_id);
-    let messageId = tempMessage.message_id;
-    await bot.deleteMessage(chatId, tempMessage.message_id);
     let mensagensDeletadas = 0;
     let erros = 0;
     let mensagensAntigas = 0;
     let semPermissao = 0;
     const canDeleteOthers = await verificarPermissoes(chatId);
-    console.log(`[DEBUG] Bot pode excluir mensagens de outros: ${canDeleteOthers}`);
-    // Tentar excluir mensagens do cache primeiro
+    console.log(`[DEBUG] Limpando mensagens para chatId=${chatId}, pode excluir outras=${canDeleteOthers}`);
     const messageIds = [...new Set(sessao.messageIds)].sort((a, b) => b - a);
     for (const id of messageIds) {
       try {
@@ -180,55 +146,29 @@ const limparMensagensChat = async (chatId) => {
       }
       await new Promise(resolve => setTimeout(resolve, 30));
     }
-    // Continuar excluindo mensagens anteriores
-    const maxTentativas = 10000; // Limite alto para tentar excluir o máximo
-    let tentativa = 0;
-    while (tentativa < maxTentativas && messageId > 1) {
-      try {
-        await bot.deleteMessage(chatId, messageId);
-        mensagensDeletadas++;
-        console.log(`[DEBUG] Mensagem ${messageId} deletada com sucesso.`);
-      } catch (err) {
-        erros++;
-        if (err.message.includes('message to delete not found')) {
-          console.log(`[DEBUG] Mensagem ${messageId} não encontrada.`);
-        } else if (err.message.includes('message is too old')) {
-          mensagensAntigas++;
-          console.log(`[DEBUG] Mensagem ${messageId} muito antiga (>48h).`);
-        } else if (err.message.includes('not enough rights')) {
-          semPermissao++;
-          console.log(`[DEBUG] Sem permissão para excluir mensagem ${messageId}.`);
-        } else {
-          console.error(`[ERROR] Erro ao deletar mensagem ${messageId}:`, err.message);
-        }
-      }
-      messageId--;
-      tentativa++;
-      await new Promise(resolve => setTimeout(resolve, 30));
-    }
-    // Atualizar sessão
     sessao.messageIds = [];
-    sessao.ultimaLimpeza = moment().format('YYYY-MM-DD HH:mm:ss');
-    sessao.mensagensDeletadas = mensagensDeletadas;
     sessoes.set(chatId, sessao);
-    // Montar feedback
-    let feedback = `🧹 *Limpeza concluída!*\n- Mensagens deletadas: ${mensagensDeletadas}\n- Erros: ${erros}`;
-    if (mensagensAntigas > 0) {
-      feedback += `\n- Mensagens muito antigas (>48h): ${mensagensAntigas}`;
-    }
-    if (semPermissao > 0) {
-      feedback += `\n- Sem permissão para excluir: ${semPermissao}`;
-    }
-    if (!canDeleteOthers) {
-      feedback += `\n⚠️ *Nota*: O bot não tem permissão para excluir mensagens de outros usuários.`;
-    }
-    console.log(`[DEBUG] Limpeza concluída: ${mensagensDeletadas} mensagens deletadas, ${erros} erros, ${mensagensAntigas} antigas, ${semPermissao} sem permissão.`);
-    return await bot.sendMessage(chatId, feedback, { parse_mode: 'Markdown' });
+    console.log(`[DEBUG] Limpeza concluída para chatId=${chatId}: ${mensagensDeletadas} deletadas, ${erros} erros, ${mensagensAntigas} antigas, ${semPermissao} sem permissão`);
+    return { mensagensDeletadas, erros, mensagensAntigas, semPermissao };
   } catch (err) {
     console.error(`[ERROR] Erro ao limpar mensagens para ${chatId}:`, err.message);
-    return await bot.sendMessage(chatId, `⚠️ *Erro ao limpar mensagens: ${err.message}*`, { parse_mode: 'Markdown' });
+    return { mensagensDeletadas: 0, erros: 1, mensagensAntigas: 0, semPermissao: 0 };
   }
 };
+
+// Agendador de limpeza automática
+setInterval(async () => {
+  console.log('[DEBUG] Iniciando limpeza automática para todos os chats ativos');
+  for (const chatId of sessoes.keys()) {
+    const sessao = sessoes.get(chatId);
+    if (!sessao || !sessao.messageIds || sessao.messageIds.length === 0) {
+      console.log(`[DEBUG] Sessão vazia ou sem mensagens para chatId=${chatId}, pulando limpeza`);
+      continue;
+    }
+    const result = await limparMensagensChat(chatId);
+    console.log(`[DEBUG] Resultado da limpeza para chatId=${chatId}:`, result);
+  }
+}, CLEANUP_INTERVAL);
 
 // Função para executar queries com timeout
 const queryWithTimeout = async (query, params, timeout = 5000) => {
@@ -322,14 +262,6 @@ bot.on('message', async (msg) => {
     return enviarMensagem(chatId, '🕒 *Sessão expirada. Envie sua senha pessoal para continuar.*');
   }
   sessao.lastUpdated = Date.now();
-  // Comando para limpar mensagens
-  if (msg.text && msg.text.toLowerCase() === '/limpar') {
-    if (!sessao.logado) {
-      return enviarMensagem(chatId, '🔒 *Você precisa estar logado para usar o comando /limpar.* Envie sua senha pessoal.');
-    }
-    await limparMensagensChat(chatId);
-    return;
-  }
   // Consulta usuários
   let usuarios;
   try {
@@ -439,7 +371,7 @@ bot.on('message', async (msg) => {
         : `✅ *Acesso ao setor ${sessao.setor.toUpperCase()} liberado.*`;
       if (sessao.setor.toLowerCase() === 'entrega') {
         await enviarMensagem(chatId, mensagem);
-        return await tratarEntrega('menu', msg, sessao, db, bot, chatId, sessoes, enviarMensagemPersistente);
+        return await tratarEntrega('menu', msg, sessao, db, bot, chatId, sessoes, enviarMensagem);
       } else {
         return enviarBotaoSair(chatId, mensagem);
       }
@@ -455,7 +387,7 @@ bot.on('message', async (msg) => {
         case 'vendas':
           return await tratarVendas(msg.text || '', msg, sessao, db, bot, enviarMensagem);
         case 'entrega':
-          return await tratarEntrega(msg.text || '', msg, sessao, db, bot, chatId, sessoes, enviarMensagemPersistente);
+          return await tratarEntrega(msg.text || '', msg, sessao, db, bot, chatId, sessoes, enviarMensagem);
         default:
           console.log(`[DEBUG] Setor desconhecido: ${sessao.setor}`);
           return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
@@ -505,10 +437,10 @@ bot.on('callback_query', async (query) => {
       return await tratarVendas(query, { chat: { id: chatId } }, sessao, db, bot, sessoes, enviarMensagem);
     }
     if (sessao.setor === 'entrega' && sessao.autenticado) {
-  console.log(`[DEBUG] Delegando callback ${data} para tratarEntrega`);
-  bot.answerCallbackQuery(query.id);
-  return await tratarEntrega(query, { chat: { id: chatId } }, sessao, db, bot, chatId, sessoes, enviarMensagemPersistente);
-}
+      console.log(`[DEBUG] Delegando callback ${data} para tratarEntrega`);
+      bot.answerCallbackQuery(query.id);
+      return await tratarEntrega(query, { chat: { id: chatId } }, sessao, db, bot, chatId, sessoes, enviarMensagem);
+    }
     if (data.startsWith('setor_')) {
       if (sessao.autenticado) {
         bot.answerCallbackQuery(query.id);

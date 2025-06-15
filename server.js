@@ -910,7 +910,7 @@ app.post('/api/atualizar_valor_recebido', async (req, res) => {
 
   try {
     const [result] = await db.query(
-      'UPDATE vendas SET valor_pago = ? WHERE id = ?',
+      'UPDATE vendas SET valor_dinheiro = ?, conferido = 1 WHERE id = ?',
       [parseFloat(valor_recebido), id]
     );
 
@@ -920,7 +920,7 @@ app.post('/api/atualizar_valor_recebido', async (req, res) => {
 
     // Opcional: Registrar log da alteração
     await db.query(
-      'INSERT INTO log_alteracoes (tabela, registro_id, acao, usuario_id, detalhes, data) VALUES (?, ?, ?, ?, ?, NOW())',
+      'INSERT INTO log_alteracoes (tabela, registro_id, acao, usuario_id, detalhes, data_hora) VALUES (?, ?, ?, ?, ?, NOW())',
       ['vendas', id, 'UPDATE', null, `Valor recebido atualizado para R$ ${valor_recebido}`]
     );
 
@@ -933,22 +933,36 @@ app.post('/api/atualizar_valor_recebido', async (req, res) => {
 
 app.get('/api/vendas', async (req, res) => {
   try {
-    const { cliente_numero, data_inicio, data_fim, status, page = 1, limit = 10 } = req.query;
+    const { cliente_numero, data_inicio, data_fim, status, forma_pagamento, valido, conferido, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
     const params = [];
     let whereClauses = [];
 
+    if (valido !== undefined) {
+      whereClauses.push('v.valido = ?');
+      params.push(parseInt(valido));
+    }
+    if (conferido !== undefined) {
+      whereClauses.push('v.conferido = ?');
+      params.push(parseInt(conferido));
+    }
     if (cliente_numero) {
       whereClauses.push('v.cliente_numero LIKE ?');
       params.push(`%${cliente_numero}%`);
     }
     if (data_inicio) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data_inicio)) {
+        return res.status(400).json({ erro: 'Formato de data_inicio inválido (use YYYY-MM-DD)' });
+      }
       whereClauses.push('DATE(v.data) >= ?');
       params.push(data_inicio);
     } else {
       whereClauses.push('DATE(v.data) = CURDATE()');
     }
     if (data_fim) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data_fim)) {
+        return res.status(400).json({ erro: 'Formato de data_fim inválido (use YYYY-MM-DD)' });
+      }
       whereClauses.push('DATE(v.data) <= ?');
       params.push(data_fim);
     }
@@ -956,14 +970,23 @@ app.get('/api/vendas', async (req, res) => {
       whereClauses.push('v.status = ?');
       params.push(status);
     }
+    if (forma_pagamento) {
+      const formas = forma_pagamento.split(',').map(f => f.trim().toLowerCase());
+      if (!formas.every(f => ['pix', 'dinheiro', 'pix+dinheiro', 'falha'].includes(f))) {
+        return res.status(400).json({ erro: 'Forma de pagamento inválida' });
+      }
+      whereClauses.push('v.forma_pagamento IN (?)');
+      params.push(formas);
+    }
 
     const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
-    
+
     const query = `
       SELECT 
         v.id,
         COALESCE(v.cliente_numero, '') AS cliente_numero,
         COALESCE(v.valor_total, 0) AS valor_total,
+        COALESCE(v.valor_pago, 0) AS valor_recebido,
         COALESCE(v.forma_pagamento, 'pix') AS forma_pagamento,
         COALESCE(v.data, NOW()) AS data,
         COALESCE(v.status, 'novo') AS status,
@@ -981,18 +1004,18 @@ app.get('/api/vendas', async (req, res) => {
       ORDER BY v.data DESC
       LIMIT ? OFFSET ?
     `;
-    
+
     const countQuery = `
       SELECT COUNT(*) as total
       FROM vendas v
       LEFT JOIN pedidos_diarios pd ON pd.venda_id = v.id
       ${where}
     `;
-    
+
     params.push(parseInt(limit), parseInt(offset));
-    
+
     const [vendas] = await db.query(query, params);
-    const [[{ total }]] = await db.query(countQuery, params.slice(0, -2)); // Remove limit e offset para contagem
+    const [[{ total }]] = await db.query(countQuery, params.slice(0, -2));
 
     res.json({
       vendas,

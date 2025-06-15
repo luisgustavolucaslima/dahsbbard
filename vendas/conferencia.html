@@ -84,7 +84,7 @@
     <div id="app">
       <div id="notification-container" class="notification-container">
 </div>
-      <nav id="navbar-main" class="navbar-fixed-top is-
+      <nav id="navbar-main" class="navbar is-fixed-top">
         <div class="navbar-brand">
           <a class="navbar-item is-hidden-desktop jb-aside-as-mobile-toggle">
             <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
@@ -110,15 +110,15 @@
           </div>
         </div>
         <div class="menu is-menu-main">
-          <p class="menu-label">Geral</p>
-          <ul class="menu-list">
-            <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
-            <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-            <li><a href="lancamentos.html" class="has-icon"><span class="icon"><i class="mdi mdi-cash-multi"></i></span><span class="menu-item-label">Lançamentos</span></a></li>
-            <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entrega</span></a></a></li>
-            <li><a href="conferencia.html" class="has-icon active"><span is-class="icon"><i class="mdi mdi fa-home"></i></span><span class="menu-item-label">Conferência</span></a></li>
-          </ul>
-          <p class="menu-label">Logic Ice</p>
+        <p class="menu-label">Geral</p>
+        <ul class="menu-list">
+        <li><a href="index.html" class=" has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+        <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+        <li><a href="lancamentos.html" class=" has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+        <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+        <li><a href="conferencia.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Conferencia</span></a></li>
+        </ul>
+       <p class="menu-label">Logic Ice</p>
         </div>
       </aside>
       <section class="section is-title-bar">
@@ -159,7 +159,7 @@
           <div class="card-content">
             <div class="field is-grouped">
               <p class="control is-expanded has-icons-left">
-                <input class="input" type="data" id="dataFiltro" placeholder="Data (DD/MM/AAAA)">
+              <input class="input" type="text" id="dataFiltro" placeholder="Data (DD/MM/AAAA)" oninput="mascaraData(this)">
                 <span class="icon is-small is-left"><i class="mdi mdi-calendar"></i></span>
               </p>
               <p class="control">
@@ -197,7 +197,7 @@
               <div class="field">
                 <label class="label">Valor Recebido (R$)</label>
                 <div class="control">
-                  <input class="input" id="valorRecebidoInput" type="number" min="0" step="0.01" placeholder="R$ 0,00">
+             <input class="input" id="valorRecebidoInput" type="number" min="0" step="0.01" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57) || event.charCode == 46)" placeholder="R$ 0,00">
                 </div>
               </div>
             </section>
@@ -280,46 +280,54 @@
       });
 
       // Atualizar Movimentações
-      async function atualizarMovimentacoes(filtros = {}) {
-        document.getElementById('loader').style.display = 'block';
-        try {
-          const query = new URLSearchParams(filtros).toString();
-          const response = await fetch(`/api/vendas?${query}`);
-          if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
-          const vendas = await response.json();
-          const tbody = document.getElementById('movimentacoesTable');
-          tbody.innerHTML = '';
-          const hoje = new Date().toISOString().split('T')[0];
-          const vendasFiltradas = vendas.filter(venda => {
-            const dataVenda = new Date(venda.data).toISOString().split('T')[0];
-            return (
-              dataVenda === (filtros.data || hoje) &&
-              ['pix', 'dinheiro', 'pix+dinheiro', 'falha'].includes(venda.forma_pagamento.toLowerCase())
-            );
-          });
-          vendasFiltradas.forEach(venda => {
-            const row = document.createElement('tr');
-            const acoes = venda.forma_pagamento.toLowerCase() !== 'falha' ? `
-              <button class="button is-small is-success" onclick="lancarValorRecebido(${venda.id})">💰 Lançar Valor</button>
-              <button class="button is-small is-info" onclick="informacoesDoPedido(${venda.id})">🔍 Ver Pedido</button>
-            ` : `
-              <button class="button is-small is-info" onclick="informacoesDoPedido(${venda.id})">🔍 Ver Pedido</button>
-            `;
-            row.innerHTML = `
-              <td>${venda.id}</td>
-              <td>${formatarCliente(venda.cliente_numero)}</td>
-              <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
-              <td>R$ ${parseFloat(venda.valor_recebido || 0).toFixed(2)}</td>
-              <td>${venda.forma_pagamento}</td>
-              <td>${formatarData(venda.data)}</td>
-              <td>${venda.status}</td>
-              <td>${acoes}</td>
-            `;
-            tbody.appendChild(row);
-          });
-          if (vendasFiltradas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma movimentação encontrada</td></tr>';
+     async function atualizarMovimentacoes(filtros = {}) {
+      document.getElementById('loader').style.display = 'block';
+      try {
+        filtros.page = filtros.page || 1;
+        filtros.limit = 10;
+        filtros.forma_pagamento = 'dinheiro,pix+dinheiro,falha'; // Filtro fixo
+        filtros.valido = 1; // Novo filtro
+        filtros.conferido = 0; // Novo filtro
+        const query = new URLSearchParams(filtros).toString();
+        const response = await fetch(`/api/vendas?${query}`);
+        if (!response.ok) throw new Error(`Erro: ${response.status}`);
+        const { vendas, total, page, totalPages } = await response.json();
+        const tbody = document.getElementById('movimentacoesTable');
+        tbody.innerHTML = '';
+        vendas.forEach(venda => {
+          const acoes = venda.forma_pagamento.toLowerCase() !== 'falha' ? `
+            <button class="button is-small is-success" onclick="lancarValorRecebido(${venda.id})">💰 Lançar Valor</button>
+            <button class="button is-small is-info" onclick="informacoesDoPedido(${venda.id})">🔍 Ver Pedido</button>
+          ` : `
+            <button class="button is-small is-info" onclick="informacoesDoPedido(${venda.id})">🔍 Ver Pedido</button>
+          `;
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${venda.id}</td>
+            <td>${formatarCliente(venda.cliente_numero)}</td>
+            <td>R$ ${parseFloat(venda.valor_total || 0).toFixed(2)}</td>
+            <td>R$ ${parseFloat(venda.valor_recebido || 0).toFixed(2)}</td>
+            <td>${venda.forma_pagamento}</td>
+            <td>${formatarData(venda.data)}</td>
+            <td>${venda.status}</td>
+            <td>${acoes}</td>
+          `;
+          tbody.appendChild(row);
+    });
+    if (vendas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="has-text-centered">Nenhuma movimentação encontrada</td></tr>';
           }
+          // Adicionar controles de paginação
+          const existingNav = document.querySelector('.pagination');
+          if (existingNav) existingNav.remove();
+          const nav = document.createElement('nav');
+          nav.className = 'pagination is-centered';
+          nav.innerHTML = `
+            <a class="pagination-previous" ${page === 1 ? 'disabled' : ''} onclick="atualizarMovimentacoes({ ...filtros, page: ${page - 1} })">Anterior</a>
+            <a class="pagination-next" ${page >= totalPages ? 'disabled' : ''} onclick="atualizarMovimentacoes({ ...filtros, page: ${page + 1} })">Próxima</a>
+            <span class="is-size-7">Página ${page} de ${totalPages} (${total} vendas)</span>
+          `;
+          tbody.parentElement.parentElement.appendChild(nav);
         } catch (err) {
           showNotification("Erro: " + err.message, "danger");
         } finally {
@@ -341,10 +349,10 @@
         pedidoIdParaValorRecebido = null;
       }
 
-      async function salvarValorRecebido() {
+        async function salvarValorRecebido() {
         const valorRecebido = document.getElementById('valorRecebidoInput').value;
-        if (!valorRecebido || valorRecebido <= 0) {
-          showNotification("Informe um valor recebido válido.", "warning");
+        if (!valorRecebido || isNaN(valorRecebido) || parseFloat(valorRecebido) <= 0) {
+          showNotification("Informe um valor recebido válido (maior que 0).", "warning");
           return;
         }
         try {
@@ -392,17 +400,46 @@
 
       // Eventos
       document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('filterMovimentacoesBtn').addEventListener('click', (e) => {
+       document.getElementById('filterMovimentacoesBtn').addEventListener('click', (e) => {
           e.preventDefault();
           const dataFiltro = document.getElementById('dataFiltro').value;
-          const filtros = dataFiltro ? { data: new Date(dataFiltro.split('/').reverse().join('-')).toISOString().split('T')[0] } : {};
+          if (dataFiltro && !/^\d{2}\/\d{2}\/\d{4}$/.test(dataFiltro)) {
+            showNotification('Data inválida. Use DD/MM/AAAA.', 'warning');
+            return;
+          }
+          let filtros = {};
+          if (dataFiltro) {
+            const [dia, mes, ano] = dataFiltro.split('/');
+            const data = new Date(`${ano}-${mes}-${dia}`);
+            if (isNaN(data.getTime()) || data.getFullYear() != ano || data.getMonth() + 1 != mes || data.getDate() != dia) {
+              showNotification('Data inválida.', 'warning');
+              return;
+            }
+            filtros.data_inicio = data.toISOString().split('T')[0];
+            filtros.data_fim = filtros.data_inicio; // Para filtrar um dia específico
+          }
           atualizarMovimentacoes(filtros);
-        });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
+          document.getElementById('refreshBtn').addEventListener('click', () => {
+          document.getElementById('dataFiltro').value = '';
           atualizarMovimentacoes();
         });
+        atualizarMovimentacoes();
+        });
       });
+
+      function mascaraData(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v.length <= 2) {
+    input.value = v;
+  } else if (v.length <= 4) {
+    input.value = `${v.slice(0, 2)}/${v.slice(2)}`;
+  } else if (v.length <= 8) {
+    input.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+  } else {
+    input.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4, 8)}`;
+  }
+}
     </script>
     <!-- Modal de Informações do Pedido -->
     <div class="modal" id="modalInfoPedido">

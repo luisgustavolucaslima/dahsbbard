@@ -656,9 +656,9 @@
               </td>`;
             tbody.appendChild(row);
           });
-          if (vendas.length === 0) {
-            tbody.innerHTML = '<li><li colspan="7" class="has-text-centered">Nenhum pedido com falha encontrado</li></li>';
-          }
+        if (vendas.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhum pedido com falha encontrado</td></tr>';
+        }
           document.getElementById('vendas-info').textContent = `Mostrando ${vendas.length} de ${total} pedidos com falha`;
           document.getElementById('pedidos-falha-pagina').textContent = `Página ${page} de ${totalPages}`;
         } catch (error) {
