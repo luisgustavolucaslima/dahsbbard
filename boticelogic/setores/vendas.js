@@ -91,7 +91,7 @@ const handleCallbacks = async (query, sessao, bot, db, sessoes) => {
       await bot.answerCallbackQuery(query.id);
       return sendMessage(
         chatId,
-        `➕ *Adicione itens ao carrinho.*\nExemplo: 1kg banana 1un coca-cola\nOu use: *ver carrinho*, *remover banana*, *produto*`,
+        `➕ *Adicione itens ao carrinho.*\nExemplo: 1un banana, 25g capulho gourmet ou combo caneta refil 1`,
         bot
       );
     }
@@ -183,115 +183,65 @@ const handleCallbacks = async (query, sessao, bot, db, sessoes) => {
           bot
         );
       }
-    
-      const carrinho = sessao.carrinho || [];
-      const valorTotal = carrinho.reduce((total, item) => {
-        const valor = parseFloat(item.valor_total);
-        return total + (isNaN(valor) ? 0 : valor);
-      }, 0);
-    
+
       const connection = await db.getConnection();
       try {
         await connection.beginTransaction();
-    
-        // Validate all products in the cart
-        const productNames = carrinho.map(item => item.nome.trim().toLowerCase());
-        const [estoque] = await connection.query(
-          `SELECT nome, quantidade, valor_unitario, id
-           FROM estoque
-           WHERE LOWER(nome) IN (${productNames.map(() => '?').join(',')})`,
-          productNames
-        );
-    
-        for (const item of carrinho) {
-          const estoqueItem = estoque.find(e => e.nome.toLowerCase() === item.nome.toLowerCase());
-          if (!estoqueItem) {
-            throw new Error(`Produto ${item.nome} não encontrado no estoque.`);
-          }
-          const quantidade = parseFloat(item.quantidade.toString().replace(/[^0-9.]/g, '')) || 0;
-          const valorUnitario = parseFloat(estoqueItem.valor_unitario);
-          if (isNaN(valorUnitario)) {
-            throw new Error(`Valor unitário inválido para ${item.nome}.`);
-          }
-          if (estoqueItem.quantidade < quantidade) {
-            throw new Error(
-              `Estoque insuficiente para ${item.nome}. Disponível: ${estoqueItem.quantidade}, solicitado: ${quantidade}`
-            );
-          }
+
+        // Separar itens normais e combos
+        const itensNormais = sessao.carrinho.filter(item => !item.isCombo);
+        const combos = sessao.carrinho.filter(item => item.isCombo);
+
+        // Processar itens normais
+        for (const item of itensNormais) {
+          const quantidade = parseFloat(item.quantidade.replace(/[^0-9.]/g, '')) || 0;
+          await connection.query(
+            `CALL registrar_venda(?, ?, ?, ?, ?)`,
+            [
+              sessao.numero_cliente,
+              sessao.metodo_pagamento,
+              sessao.usuario_id,
+              item.id,
+              quantidade
+            ]
+          );
         }
-    
-        // Save sale in vendas table
-        const [result] = await connection.query(
-          `INSERT INTO vendas (cliente_numero, forma_pagamento, valor_total, valor_dinheiro, recebido, status, data, vendedor_id)
-           VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)`,
-          [
-            sessao.numero_cliente || 'Não informado',
-            sessao.metodo_pagamento || 'Não informado',
-            valorTotal || 0,
-            sessao.metodo_pagamento === 'dinheiro_pix' ? sessao.valor_dinheiro || 0 : null,
-            0,
-            'novo',
-            sessao.usuario_id || null,
-          ]
-        );
-        const vendaId = result.insertId;
-        console.log(`[DEBUG] Venda salva com ID: ${vendaId}`);
-    
-        // Save order in pedidos_diarios table
-        const [pedidoResult] = await connection.query(
-          `INSERT INTO pedidos_diarios (cliente_numero, status, recebido, venda_id)
-           VALUES (?, ?, ?, ?)`,
-          [
-            sessao.numero_cliente || 'Não informado',
-            'novo',
-            0,
-            vendaId,
-          ]
-        );
-        const pedidoId = pedidoResult.insertId;
-        console.log(`[DEBUG] Pedido diário salvo com ID: ${pedidoId}`);
-    
-        // Save order items in pedido_itens table
-        const itemQueries = carrinho.map(item => {
-          const quantidade = parseFloat(item.quantidade.toString().replace(/[^0-9.]/g, '')) || 0;
-          return connection.query(
-            `INSERT INTO pedido_itens (pedido_id, produto_id, quantidade)
-             VALUES (?, ?, ?)`,
-            [pedidoId, item.id, quantidade]
+
+        // Processar combos
+        for (const combo of combos) {
+          const quantidadeCombo = parseFloat(combo.quantidade.replace(/[^0-9.]/g, '')) || 0;
+          await connection.query(
+            `CALL registrar_venda_combo_caneta_refil(?, ?, ?, ?)`,
+            [
+              sessao.numero_cliente,
+              sessao.metodo_pagamento,
+              sessao.usuario_id,
+              quantidadeCombo
+            ]
           );
-        });
-        await Promise.all(itemQueries);
-        console.log(`[DEBUG] Itens adicionados ao pedido: ${carrinho.length} itens`);
-    
-        // Update stock
-        const stockQueries = carrinho.map(item => {
-          const quantidade = parseFloat(item.quantidade.toString().replace(/[^0-9.]/g, '')) || 0;
-          const nomeProduto = item.nome.trim().toLowerCase();
-          return connection.query(
-            `UPDATE estoque SET quantidade = quantidade - ? WHERE LOWER(nome) = ?`,
-            [quantidade, nomeProduto]
-          );
-        });
-        await Promise.all(stockQueries);
-        console.log(`[DEBUG] Estoque atualizado para ${carrinho.length} produtos`);
-    
-        // Save payment receipt
+        }
+
+        // Salvar comprovante, se houver
         if (sessao.comprovante_pagamento && sessao.comprovante_pagamento !== 'Sem comprovante') {
           const buffer = Buffer.from(sessao.comprovante_pagamento, 'base64');
           if (buffer.length > 10 * 1024 * 1024) {
             throw new Error('Imagem do comprovante muito grande.');
           }
-          await connection.query(
-            `UPDATE vendas SET comprovante = ? WHERE id = ?`,
-            [buffer, vendaId]
+          const [vendasRecentes] = await connection.query(
+            `SELECT id FROM vendas WHERE cliente_numero = ? ORDER BY id DESC LIMIT ?`,
+            [sessao.numero_cliente, itensNormais.length + combos.length]
           );
-          console.log(`[DEBUG] Comprovante salvo para venda ID: ${vendaId}`);
+          for (const venda of vendasRecentes) {
+            await connection.query(
+              `UPDATE vendas SET comprovante = ? WHERE id = ?`,
+              [buffer, venda.id]
+            );
+          }
         }
-    
+
         await connection.commit();
-        console.log(`[DEBUG] Transação concluída com sucesso.`);
-    
-        // Clear session
+
+        // Limpar sessão
         sessao.carrinho = [];
         sessao.etapa = null;
         sessao.metodo_pagamento = null;
@@ -299,13 +249,11 @@ const handleCallbacks = async (query, sessao, bot, db, sessoes) => {
         sessao.numero_cliente = null;
         sessao.valor_dinheiro = null;
         sessao.lastUpdated = Date.now();
-    
+
         await bot.answerCallbackQuery(query.id);
         await sendMessage(chatId, `✅ *Venda finalizada com sucesso! Pedido registrado.*`, bot);
         return showInitialMenu(chatId, sessao.nome, bot);
-      }
-
-catch (err) {
+      } catch (err) {
         await connection.rollback();
         console.error(`[ERROR] Erro ao finalizar pedido:`, err.message);
         await bot.answerCallbackQuery(query.id);
@@ -320,49 +268,66 @@ catch (err) {
     }
 
     if (data === 'lista') {
-  const [categorias] = await db.query(`
-    SELECT DISTINCT categoria 
-    FROM estoque 
-    WHERE quantidade > 0
-  `);
+      const [categorias] = await db.query(`SELECT DISTINCT categoria FROM estoque WHERE quantidade > 0`);
+      const [promocoes] = await db.query(
+        `SELECT nome, tipo, preco_promocional, quantidade_minima, produto_id, produto_id_secundario
+         FROM promocoes WHERE ativa = 1 AND (data_inicio IS NULL OR data_inicio <= CURDATE())
+         AND (data_fim IS NULL OR data_fim >= CURDATE())`
+      );
 
-  let mensagem = 
-`🚨 *NÃO REPASSE A LISTA!*
-
-🕐 *ENTREGA DE MANHÃ, MEIO DA TARDE, E FIM DA TARDE!*
-💸 *PIX SÓ ANTECIPADO! FAVOR ENVIAR O COMPROVANTE!*
-🔑 *ANTES DE FAZER O PIX PEÇA A CHAVE!*
-💵 *EVITE PIX! PREFERÊNCIA NO DINHEIRO!*
-🛒 *PEDIDO MÍNIMO R$50,00!*
-⚡ *ENTREGA GRÁTIS! ENTREGA RÁPIDA!*
-
+      let mensagem = 
+`🚨 *NÃO REPASSE A LISTA!*\n
+🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️\n
+🕐 *ATENDIMENTO TODOS OS DIAS, DAS 08:00 às 22:00*\n
+🕐 *ENTREGA DE MANHÃ, MEIO DA TARDE, E FIM DA TARDE!*\n
+💸 *PIX SÓ ANTECIPADO! FAVOR ENVIAR O COMPROVANTE!*\n
+🔑 *ANTES DE FAZER O PIX PEÇA A CHAVE!*\n
+💵 *EVITE PIX! PREFERÊNCIA NO DINHEIRO!*\n
+🛒 *PEDIDO MÍNIMO R$50,00!*\n
+⚡ *ENTREGA GRÁTIS! ENTREGA RÁPIDA!*\n
+🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️\n
 `;
 
-  for (const cat of categorias) {
-    const [produtos] = await db.query(`
-      SELECT nome, medida, quantidade, valor_unitario
-      FROM estoque
-      WHERE categoria = ? AND quantidade > 0
-    `, [cat.categoria]);
+      for (const cat of categorias) {
+        const [produtos] = await db.query(
+          `SELECT id, nome, medida, quantidade, valor_unitario FROM estoque WHERE categoria = ? AND quantidade > 0`,
+          [cat.categoria]
+        );
 
-    if (produtos.length > 0) {
-      mensagem += `_${cat.categoria}_\n`;
-      produtos.forEach(p => {
-        mensagem += `• ${p.nome} – R$${parseFloat(p.valor_unitario).toFixed(2)}\n`;
-      });
-      mensagem += '\n';
+        if (produtos.length > 0) {
+          mensagem += `*${cat.categoria}\n\n*`;
+          for (const p of produtos) {
+            mensagem += `• ${p.nome} – R$${parseFloat(p.valor_unitario).toFixed(2)}\n`;
+            const promocoesProduto = promocoes.filter(promo => promo.produto_id === p.id && promo.tipo === 'quantidade');
+            for (const promo of promocoesProduto) {
+              mensagem += `  - Promoção: ${promo.quantidade_minima}${p.medida} por R$${parseFloat(promo.preco_promocional).toFixed(2)} cada\n`;
+            }
+          }
+          mensagem += '\n';
+        }
+      }
+
+      // Adicionar seção de combos
+      const combos = promocoes.filter(promo => promo.tipo === 'combo');
+      if (combos.length > 0) {
+        mensagem += `*Combos Promocionais*\n\n`;
+        for (const combo of combos) {
+          const [produto1] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id]);
+          const [produto2] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id_secundario]);
+          mensagem += `• ${combo.nome}: ${produto1[0].nome} + ${produto2[0].nome} por R$${parseFloat(combo.preco_promocional).toFixed(2)}\n`;
+        }
+        mensagem += '\n';
+      }
+
+      mensagem += 
+`🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️\n
+⚡ *Antecipe seu pedido, Evite ficar esperando.*`;
+
+      await bot.answerCallbackQuery(query.id);
+      await sendMessage(chatId, mensagem, bot);
+      sessao.etapa = null;
+      return showInitialMenu(chatId, sessao.nome, bot);
     }
-  }
-
-  mensagem +=
-`⚡ *Antecipe seu pedido, Evite ficar esperando.*`;
-
-  await bot.answerCallbackQuery(query.id);
-  await sendMessage(chatId, mensagem, bot);
-  sessao.etapa = null;
-  return showInitialMenu(chatId, sessao.nome, bot);
-}
-
 
     if (data === 'laranja') {
       const [laranja] = await db.query(`SELECT pix, qrcodex64 FROM laranja WHERE status = 1 LIMIT 1`);
@@ -378,8 +343,8 @@ catch (err) {
           const buffer = Buffer.from(base64Data, 'base64');
           if (!base64Data) {
             throw new Error('QR code inválido ou mal formatado');
-              }
-  
+          }
+
           await bot.sendPhoto(chatId, buffer, {
             caption: `🟠 *Pix para pagamento:*\n${escapeMarkdown(pix)}\n\nUse o QR Code acima ou copie o código Pix.`,
           });
@@ -460,7 +425,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
       bot
     );
     return showInitialMenu(chatId, sessao.nome, bot);
-  }
+ }
 
   if (texto.toLowerCase() === 'produto') {
     const [categorias] = await db.query(`SELECT id, nome FROM categorias_estoque`);
@@ -540,57 +505,171 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
       return showInitialMenu(chatId, sessao.nome, bot);
     }
 
-    const itens = texto.trim().split(/\s+/);
-    if (itens.length < 2 || itens.length % 2 !== 0) {
+    // Suporte para combo Caneta + Refil
+    if (texto.toLowerCase().startsWith('combo caneta refil')) {
+      const quantidadeMatch = texto.match(/(\d+)/);
+      if (!quantidadeMatch) {
+        await sendMessage(
+          chatId,
+          `⚠️ *Formato inválido.* Use: combo caneta refil 1`,
+          bot
+        );
+        sessao.lastUpdated = Date.now();
+        return;
+      }
+      const quantidadeCombo = parseInt(quantidadeMatch[1]);
+      if (quantidadeCombo <= 0) {
+        await sendMessage(
+          chatId,
+          `⚠️ *Quantidade inválida para o combo.*`,
+          bot
+        );
+        return;
+      }
+
+      // Verificar estoque
+      const [estoque] = await db.query(
+        `SELECT id, nome, quantidade FROM estoque WHERE id IN (6, 7)`
+      );
+      const caneta = estoque.find(p => p.id === 6);
+      const refil = estoque.find(p => p.id === 7);
+      if (!caneta || !refil || caneta.quantidade < quantidadeCombo || refil.quantidade < quantidadeCombo) {
+        await sendMessage(
+          chatId,
+          `⚠️ *Estoque insuficiente para o combo Caneta + Refil.*`,
+          bot
+        );
+        return;
+      }
+
+      // Consultar preço do combo
+      const [promocao] = await db.query(
+        `SELECT preco_promocional FROM promocoes WHERE tipo = 'combo' AND produto_id = 6 AND produto_id_secundario = 7 AND ativa = 1`
+      );
+      const precoCombo = promocao.length ? parseFloat(promocao[0].preco_promocional) : 400.00; // Preço padrão (150+250)
+
+      sessao.carrinho.push({
+        id: 'combo_caneta_refil',
+        nome: 'Combo Caneta + Refil',
+        quantidade: `${quantidadeCombo}un`,
+        valor_unitario: precoCombo,
+        valor_total: precoCombo * quantidadeCombo,
+        isCombo: true,
+        items: [
+          { produto_id: 6, quantidade: quantidadeCombo },
+          { produto_id: 7, quantidade: quantidadeCombo }
+        ]
+      });
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: '➕ Adicionar mais itens', callback_data: 'adicionar_itens' }],
+          [{ text: '✅ Finalizar', callback_data: 'finalizar' }],
+          [{ text: '🛑 Cancelar', callback_data: 'cancelar' }],
+        ],
+      };
       await sendMessage(
         chatId,
-        `⚠️ *Formato inválido.* Use: 1kg banana 1un coca-cola`,
+        `✅ ${quantidadeCombo}un Combo Caneta + Refil adicionado ao carrinho por R$${precoCombo.toFixed(2)} cada.`,
+        bot,
+        { reply_markup: keyboard }
+      );
+      sessao.lastUpdated = Date.now();
+      return;
+    }
+
+    // Lógica para itens individuais
+    const itens = texto.trim().match(/(\d+\w*)\s+(.+)/);
+    if (!itens || itens.length < 3) {
+      await sendMessage(
+        chatId,
+        `⚠️ *Formato inválido.* Use: 1un 25g capulho gourmet ou combo caneta refil 1`,
         bot
       );
       sessao.lastUpdated = Date.now();
       return;
     }
 
-    let mensagem = '';
-    for (let i = 0; i < itens.length; i += 2) {
-      const quantidadeStr = itens[i];
-      const nome = itens[i + 1].toLowerCase();
-      const quantidade = parseFloat(quantidadeStr.replace(/[^0-9.]/g, ''));
-      if (isNaN(quantidade) || quantidade <= 0) {
-        mensagem += `⚠️ Quantidade inválida para "${escapeMarkdown(nome)}".\n`;
-        continue;
-      }
-      const [produtos] = await db.query(
-        `SELECT id, nome, medida, quantidade, valor_unitario
-         FROM estoque
-         WHERE LOWER(nome) = ? AND quantidade >= ?`,
-        [nome, quantidade]
+    const quantidadeStr = itens[1];
+    const nome = itens[2].toLowerCase();
+    const quantidadeMatch = quantidadeStr.match(/(\d+)(?:\w*)/);
+    if (!quantidadeMatch) {
+      await sendMessage(
+        chatId,
+        `⚠️ Quantidade inválida para "${escapeMarkdown(nome)}".`,
+        bot
       );
-      if (produtos.length === 0) {
-        const [estoque] = await db.query(
-          `SELECT quantidade FROM estoque WHERE LOWER(nome) = ?`,
-          [nome]
-        );
-        const disponivel = estoque.length > 0 ? estoque[0].quantidade : 0;
-        mensagem += `⚠️ Produto ${escapeMarkdown(nome)} não encontrado ou estoque insuficiente (disponível: ${disponivel}).\n`;
-        continue;
-      }
-      const produto = produtos[0];
-      const valorUnitario = parseFloat(produto.valor_unitario);
-      if (isNaN(valorUnitario)) {
-        mensagem += `⚠️ Valor unitário inválido para "${escapeMarkdown(nome)}".\n`;
-        continue;
-      }
-      const valorTotal = quantidade * valorUnitario;
-      sessao.carrinho.push({
-        id: produto.id,
-        nome: produto.nome,
-        quantidade: `${quantidade}${produto.medida}`,
-        valor_unitario: valorUnitario,
-        valor_total: valorTotal,
-      });
-      mensagem += `✅ ${quantidade}${produto.medida} ${escapeMarkdown(produto.nome)} adicionado ao carrinho.\n`;
+      sessao.lastUpdated = Date.now();
+      return;
     }
+
+    const quantidade = parseFloat(quantidadeMatch[1]);
+    if (isNaN(quantidade) || quantidade <= 0) {
+      await sendMessage(
+        chatId,
+        `⚠️ Quantidade inválida para "${escapeMarkdown(nome)}".`,
+        bot
+      );
+      sessao.lastUpdated = Date.now();
+      return;
+    }
+
+    // Consultar produto e preço promocional
+    const [produtos] = await db.query(
+      `SELECT id, nome, medida, quantidade FROM estoque WHERE LOWER(nome) = ?`,
+      [nome]
+    );
+
+    if (produtos.length === 0) {
+      const [estoque] = await db.query(
+        `SELECT quantidade FROM estoque WHERE LOWER(nome) = ?`,
+        [nome]
+      );
+      const disponivel = estoque.length > 0 ? estoque[0].quantidade : 0;
+      await sendMessage(
+        chatId,
+        `⚠️ Produto ${escapeMarkdown(nome)} não encontrado ou estoque insuficiente (disponível: ${disponivel}).`,
+        bot
+      );
+      return;
+    }
+
+    const produto = produtos[0];
+    if (produto.quantidade < quantidade) {
+      await sendMessage(
+        chatId,
+        `⚠️ Estoque insuficiente para ${escapeMarkdown(nome)}. Disponível: ${produto.quantidade}.`,
+        bot
+      );
+      return;
+    }
+
+
+   // Chamar procedimento calcular_preco_promocional
+      const [precoResult] = await db.query(
+        `CALL calcular_preco_promocional(?, ?)`,
+        [produto.id, quantidade]
+      );
+      const valorUnitario = parseFloat(precoResult[0][0].preco_unitario);
+      if (isNaN(valorUnitario)) {
+        await sendMessage(
+          chatId,
+          `⚠️ Valor unitário inválido para "${escapeMarkdown(nome)}".`,
+          bot
+        );
+        return;
+      }
+
+    const valorTotal = quantidade * valorUnitario;
+    sessao.carrinho.push({
+      id: produto.id,
+      nome: produto.nome,
+      quantidade: `${quantidade}${produto.medida}`,
+      valor_unitario: valorUnitario,
+      valor_total: valorTotal,
+      isCombo: false
+    });
+
     const keyboard = {
       inline_keyboard: [
         [{ text: '➕ Adicionar mais itens', callback_data: 'adicionar_itens' }],
@@ -600,7 +679,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
     };
     await sendMessage(
       chatId,
-      mensagem || '⚠️ *Nenhum item válido adicionado.*',
+      `✅ ${quantidade}${produto.medida} ${escapeMarkdown(produto.nome)} adicionado ao carrinho por R$${valorUnitario.toFixed(2)} cada.`,
       bot,
       { reply_markup: keyboard }
     );
@@ -629,7 +708,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
         if (imageBuffer.length > 10 * 1024 * 1024) {
           throw new Error('Imagem muito grande (máximo 10MB).');
         }
-  
+
         const saveDir = './comprovantes';
         if (!fs.existsSync(saveDir)) {
           fs.mkdirSync(saveDir, { recursive: true });
@@ -638,7 +717,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
         const filePath = path.join(saveDir, fileName);
         fs.writeFileSync(filePath, imageBuffer);
         console.log(`[DEBUG] Imagem salva em: ${filePath}`);
-  
+
         sessao.comprovante_pagamento = imageBuffer.toString('base64');
         sessao.etapa = sessao.metodo_pagamento === 'dinheiro_pix' ? 'valor_dinheiro' : 'numero_cliente';
         sessao.lastUpdated = Date.now();
@@ -666,7 +745,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
     sessao.lastUpdated = Date.now();
     return;
   }
-  
+
   if (sessao.etapa === 'valor_dinheiro') {
     const valorDinheiro = parseFloat(texto.replace(/[^0-9.]/g, ''));
     if (isNaN(valorDinheiro) || valorDinheiro < 0) {
@@ -768,7 +847,7 @@ const handleSales = async (texto, msg, sessao, db, bot) => {
 
 // Exportar função compatível com chatbot.js
 module.exports = async (texto, msg, sessao, db, bot, sessoes) => {
-  if (!sessao) {
+   if (!sessao) {
     console.error('[ERROR] Sessão não definida ao chamar vendas.js');
     return sendMessage(
       msg.chat.id.toString(),

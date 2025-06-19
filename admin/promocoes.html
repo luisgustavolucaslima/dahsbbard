@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="has-aside-left has-aside-mobile-transition has-navbar-fixed-top has-aside-expanded">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Promoções</title>
+  <link rel="stylesheet" href="css/main.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@6.9.96/css/materialdesignicons.min.css">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+</head>
+<body>
+  <!-- Notificação -->
+  <div id="notificacao" class="notification is-hidden"></div>
+
+  <div id="app">
+    <nav id="navbar-main" class="navbar is-fixed-top">
+      <div class="navbar-brand">
+        <a class="navbar-item is-hidden-desktop jb-aside-mobile-toggle">
+          <span class="icon"><i class="mdi mdi-forwardburger mdi-24px"></i></span>
+        </a>
+      </div>
+      <div class="navbar-brand is-right">
+        <a class="navbar-item is-hidden-desktop jb-navbar-menu-toggle" data-target="navbar-menu">
+          <span class="icon"><i class="mdi mdi-dots-vertical"></i></span>
+        </a>
+      </div>
+      <div class="navbar-menu fadeIn animated faster" id="navbar-menu">
+        <div class="navbar-end">
+          <a title="Log out" class="navbar-item is-desktop-icon-only" onclick="logout()">
+            <span class="icon"><i class="mdi mdi-logout"></i></span><span>Log out</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+    <aside class="aside is-placed-left is-expanded">
+      <div class="aside-tools">
+        <div class="aside-tools-label">
+          <span><b>Admin</b></span>
+        </div>
+      </div>
+      <div class="menu is-menu-main">
+        <p class="menu-label">Geral</p>
+        <ul class="menu-list">
+          <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
+          <li><a href="usuarios.html" class="has-icon"><span class="icon"><i class="mdi mdi-account-circle"></i></span><span class="menu-item-label">Usuários</span></a></li>
+          <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
+          <li><a href="promocoes.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-sale"></i></span><span class="menu-item-label">Promoções</span></a></li>
+          <li><a href="lancamentos.html" class="has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lançamentos</span></a></li>
+        </ul>
+        <p class="menu-label">Logic Ice</p>
+        <ul class="menu-list">
+          <li><a href="../producao/producao.html" class="has-icon"><span class="icon"><i class="mdi mdi-table"></i></span><span class="menu-item-label">Produção</span></a></li>
+          <li><a href="vendas.html" class="has-icon"><span class="icon"><i class="mdi mdi-square-edit-outline"></i></span><span class="menu-item-label">Vendas</span></a></li>
+          <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery-outline"></i></span><span class="menu-item-label">Entregas</span></a></li>
+        </ul>
+      </div>
+    </aside>
+    <section class="section is-title-bar">
+      <div class="level">
+        <div class="level-left">
+          <div class="level-item">
+            <ul><li>Admin</li><li>Promoções</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="hero is-hero-bar">
+      <div class="hero-body">
+        <div class="level">
+          <div class="level-left">
+            <div class="level-item"><h1 class="title">Promoções</h1></div>
+          </div>
+          <div class="level-right">
+            <button id="adicionarpromocao" class="button is-success mr-2" onclick="openModal('addPromocaoModal')">Adicionar Promoção</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="section is-main-section">
+      <div class="card mb-6">
+        <header class="card-header">
+          <p class="card-header-title"><span class="icon"><i class="mdi mdi-sale"></i></span>Promoções</p>
+        </header>
+        <div class="card-content">
+          <div class="box">
+            <table class="table is-fullwidth is-striped">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nome</th>
+                  <th>Tipo</th>
+                  <th>Produto(s)</th>
+                  <th>Quantidade Mínima</th>
+                  <th>Preço Promocional</th>
+                  <th>Data Início</th>
+                  <th>Data Fim</th>
+                  <th>Ativa</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="promocoesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Adicionar Promoção -->
+      <div class="modal" id="addPromocaoModal">
+        <div class="modal-background" onclick="closeModal('addPromocaoModal')"></div>
+        <div class="modal-content">
+          <div class="box">
+            <h2 class="subtitle">Adicionar Promoção</h2>
+            <form id="addPromocaoForm">
+              <div class="field">
+                <label class="label">Nome</label>
+                <div class="control">
+                  <input class="input" type="text" name="nome" required>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Tipo</label>
+                <div class="control">
+                  <div class="select">
+                    <select name="tipo" onchange="togglePromocaoFields()">
+                      <option value="quantidade">Por Quantidade</option>
+                      <option value="combo">Combo</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div id="quantidadeFields">
+                <div class="field">
+                  <label class="label">Produto</label>
+                  <div class="control">
+                    <div class="select">
+                      <select name="produto_id" required>
+                        <option value="">Selecione um produto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Quantidade Mínima</label>
+                  <div class="control">
+                    <input class="input" type="number" step="0.01" name="quantidade_minima" required>
+                  </div>
+                </div>
+              </div>
+              <div id="comboFields" style="display: none;">
+                <div class="field">
+                  <label class="label">Produto Principal</label>
+                  <div class="control">
+                    <div class="select">
+                      <select name="produto_id_combo" required>
+                        <option value="">Selecione um produto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Produto Secundário</label>
+                  <div class="control">
+                    <div class="select">
+                      <select name="produto_id_secundario" required>
+                        <option value="">Selecione um produto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Preço Promocional</label>
+                <div class="control">
+                  <input class="input" type="number" step="0.01" name="preco_promocional" required>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Data Início (opcional)</label>
+                <div class="control">
+                  <input class="input" type="date" name="data_inicio">
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Data Fim (opcional)</label>
+                <div class="control">
+                  <input class="input" type="date" name="data_fim">
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Ativa</label>
+                <div class="control">
+                  <label class="checkbox">
+                    <input type="checkbox" name="ativa" checked>
+                    Promoção ativa
+                  </label>
+                </div>
+              </div>
+              <div class="field is-grouped">
+                <div class="control">
+                  <button class="button is-primary" type="submit">Salvar</button>
+                </div>
+                <div class="control">
+                  <button class="button is-link is-light" type="button" onclick="closeModal('addPromocaoModal')">Cancelar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        <button class="modal-close is-large" aria-label="close" onclick="closeModal('addPromocaoModal')"></button>
+      </div>
+
+      <!-- Modal Editar Promoção -->
+      <div class="modal" id="editPromocaoModal">
+        <div class="modal-background" onclick="closeModal('editPromocaoModal')"></div>
+        <div class="modal-content">
+          <div class="box">
+            <h2 class="subtitle">Editar Promoção</h2>
+            <form id="editPromocaoForm">
+              <input type="hidden" name="id">
+              <div class="field">
+                <label class="label">Nome</label>
+                <div class="control">
+                  <input class="input" type="text" name="nome" required>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Tipo</label>
+                <div class="control">
+                  <div class="select">
+                    <select name="tipo" onchange="toggleEditPromocaoFields()">
+                      <option value="quantidade">Por Quantidade</option>
+                      <option value="combo">Combo</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div id="editQuantidadeFields">
+                <div class="field">
+                  <label class="label">Produto</label>
+                  <div class="control">
+                    <div class="select">
+                      <select name="produto_id" required>
+                        <option value="">Selecione um produto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Quantidade Mínima</label>
+                  <div class="control">
+                    <input class="input" type="number" step="0.01" name="quantidade_minima" required>
+                  </div>
+                </div>
+              </div>
+              <div id="editComboFields" style="display: none;">
+                <div class="field">
+                  <label class="label">Produto Principal</label>
+                  <div class="control">
+                    <div class="select">
+                      <select name="produto_id_combo" required>
+                        <option value="">Selecione um produto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Produto Secundário</label>
+                  <div class="control">
+                    <div class="select">
+                      <select name="produto_id_secundario" required>
+                        <option value="">Selecione um produto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Preço Promocional</label>
+                <div class="control">
+                  <input class="input" type="number" step="0.01" name="preco_promocional" required>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Data Início (opcional)</label>
+                <div class="control">
+                  <input class="input" type="date" name="data_inicio">
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Data Fim (opcional)</label>
+                <div class="control">
+                  <input class="input" type="date" name="data_fim">
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Ativa</label>
+                <div class="control">
+                  <label class="checkbox">
+                    <input type="checkbox" name="ativa">
+                    Promoção ativa
+                  </label>
+                </div>
+              </div>
+              <div class="field is-grouped">
+                <div class="control">
+                  <button class="button is-primary" type="submit">Salvar</button>
+                </div>
+                <div class="control">
+                  <button class="button is-danger" type="button" onclick="openDeleteConfirmation()">Deletar</button>
+                </div>
+                <div class="control">
+                  <button class="button is-link is-light" type="button" onclick="closeModal('editPromocaoModal')">Cancelar</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        <button class="modal-close is-large" aria-label="close" onclick="closeModal('editPromocaoModal')"></button>
+      </div>
+
+      <!-- Modal Confirmação de Exclusão -->
+      <div class="modal" id="deleteConfirmationModal">
+        <div class="modal-background" onclick="closeModal('deleteConfirmationModal')"></div>
+        <div class="modal-content">
+          <div class="box">
+            <h2 class="subtitle">Confirmação</h2>
+            <p>Você tem certeza que deseja excluir esta promoção?</p>
+            <div class="field is-grouped">
+              <div class="control">
+                <button class="button is-danger" onclick="deletePromocao()">Sim</button>
+              </div>
+              <div class="control">
+                <button class="button is-link is-light" onclick="closeModal('deleteConfirmationModal')">Cancelar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="modal-close is-large" aria-label="close" onclick="closeModal('deleteConfirmationModal')"></button>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="content has-text-centered">
+        <p>© 2025, M</p>
+      </div>
+    </footer>
+
+    <script>
+      // Função para mostrar notificações
+      function mostrarNotificacao(mensagem, tipo = 'is-info', tempo = 4000) {
+        const notif = document.getElementById('notificacao');
+        if (!notif) return;
+        notif.className = `notification ${tipo}`;
+        notif.innerHTML = `
+          <button class="delete" onclick="this.parentElement.classList.add('is-hidden')"></button>
+          ${mensagem}
+        `;
+        notif.classList.remove('is-hidden');
+        setTimeout(() => {
+          notif.classList.add('is-hidden');
+        }, tempo);
+      }
+
+      // Função de logout
+      function logout() {
+        localStorage.removeItem('usuario');
+        localStorage.removeItem('permissao');
+        mostrarNotificacao('Logout realizado com sucesso!', 'is-success');
+        setTimeout(() => {
+          window.location.href = '../login.html';
+        }, 1000);
+      }
+
+      // Funções para manipular modais
+      function openModal(modalId) {
+        document.getElementById(modalId).classList.add('is-active');
+      }
+
+      function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('is-active');
+      }
+
+      // Alternar campos com base no tipo de promoção
+      function togglePromocaoFields() {
+        const tipo = document.querySelector('#addPromocaoForm select[name="tipo"]').value;
+        document.getElementById('quantidadeFields').style.display = tipo === 'quantidade' ? 'block' : 'none';
+        document.getElementById('comboFields').style.display = tipo === 'combo' ? 'block' : 'none';
+      }
+
+      function toggleEditPromocaoFields() {
+        const tipo = document.querySelector('#editPromocaoForm select[name="tipo"]').value;
+        document.getElementById('editQuantidadeFields').style.display = tipo === 'quantidade' ? 'block' : 'none';
+        document.getElementById('editComboFields').style.display = tipo === 'combo' ? 'block' : 'none';
+      }
+
+      // Carregar produtos para os selects
+      async function loadProdutos() {
+        try {
+          const response = await fetch('/produtos');
+          if (!response.ok) throw new Error('Erro ao carregar produtos');
+          const produtos = await response.json();
+          const selects = [
+            document.querySelector('#addPromocaoForm select[name="produto_id"]'),
+            document.querySelector('#addPromocaoForm select[name="produto_id_combo"]'),
+            document.querySelector('#addPromocaoForm select[name="produto_id_secundario"]'),
+            document.querySelector('#editPromocaoForm select[name="produto_id"]'),
+            document.querySelector('#editPromocaoForm select[name="produto_id_combo"]'),
+            document.querySelector('#editPromocaoForm select[name="produto_id_secundario"]')
+          ];
+          selects.forEach(select => {
+            select.innerHTML = '<option value="">Selecione um produto</option>';
+            produtos.forEach(produto => {
+              select.innerHTML += `<option value="${produto.id}">${produto.nome}</option>`;
+            });
+          });
+        } catch (err) {
+          mostrarNotificacao('Erro ao carregar produtos: ' + err.message, 'is-danger');
+        }
+      }
+
+      // Carregar promoções na tabela
+      async function loadPromocoes() {
+        try {
+          const response = await fetch('/promocoes');
+          if (!response.ok) throw new Error('Erro ao carregar promoções');
+          const promocoes = await response.json();
+          const tbody = document.getElementById('promocoesTableBody');
+          tbody.innerHTML = '';
+          promocoes.forEach(p => {
+            const produto = p.produto_nome || 'N/A';
+            const produtoSecundario = p.produto_secundario_nome || '';
+            const produtos = p.tipo === 'combo' ? `${produto} + ${produtoSecundario}` : produto;
+            const quantidadeMinima = p.quantidade_minima ? p.quantidade_minima : '-';
+            const dataInicio = p.data_inicio ? new Date(p.data_inicio).toLocaleDateString('pt-BR') : '-';
+            const dataFim = p.data_fim ? new Date(p.data_fim).toLocaleDateString('pt-BR') : '-';
+            const ativa = p.ativa ? 'Sim' : 'Não';
+            tbody.innerHTML += `
+              <tr>
+                <td>${p.id}</td>
+                <td>${p.nome}</td>
+                <td>${p.tipo === 'quantidade' ? 'Por Quantidade' : 'Combo'}</td>
+                <td>${produtos}</td>
+                <td>${quantidadeMinima}</td>
+                <td>R$${parseFloat(p.preco_promocional).toFixed(2)}</td>
+                <td>${dataInicio}</td>
+                <td>${dataFim}</td>
+                <td>${ativa}</td>
+                <td>
+                  <button class="button is-small is-info" onclick='editPromocao(${JSON.stringify(p)})'>Editar</button>
+                </td>
+              </tr>
+            `;
+          });
+        } catch (err) {
+          mostrarNotificacao('Erro ao carregar promoções: ' + err.message, 'is-danger');
+        }
+      }
+
+      // Editar promoção
+      function editPromocao(promocao) {
+        const form = document.getElementById('editPromocaoForm');
+        form.querySelector('[name="id"]').value = promocao.id;
+        form.querySelector('[name="nome"]').value = promocao.nome;
+        form.querySelector('[name="tipo"]').value = promocao.tipo;
+        form.querySelector('[name="preco_promocional"]').value = promocao.preco_promocional;
+        form.querySelector('[name="data_inicio"]').value = promocao.data_inicio ? promocao.data_inicio.split('T')[0] : '';
+        form.querySelector('[name="data_fim"]').value = promocao.data_fim ? promocao.data_fim.split('T')[0] : '';
+        form.querySelector('[name="ativa"]').checked = promocao.ativa;
+        if (promocao.tipo === 'quantidade') {
+          form.querySelector('[name="produto_id"]').value = promocao.produto_id;
+          form.querySelector('[name="quantidade_minima"]').value = promocao.quantidade_minima;
+        } else {
+          form.querySelector('[name="produto_id_combo"]').value = promocao.produto_id;
+          form.querySelector('[name="produto_id_secundario"]').value = promocao.produto_id_secundario;
+        }
+        toggleEditPromocaoFields();
+        openModal('editPromocaoModal');
+      }
+
+      // Abrir modal de confirmação de exclusão
+      function openDeleteConfirmation() {
+        openModal('deleteConfirmationModal');
+      }
+
+      // Excluir promoção
+      async function deletePromocao() {
+        const id = document.querySelector('#editPromocaoForm [name="id"]').value;
+        try {
+          const response = await fetch(`/promocoes/${id}`, { method: 'DELETE' });
+          if (!response.ok) throw new Error('Erro ao excluir promoção');
+          mostrarNotificacao('Promoção excluída com sucesso!', 'is-success');
+          closeModal('deleteConfirmationModal');
+          closeModal('editPromocaoModal');
+          loadPromocoes();
+        } catch (err) {
+          mostrarNotificacao('Erro ao excluir promoção: ' + err.message, 'is-danger');
+        }
+      }
+
+      // Manipular formulário de adicionar promoção
+      document.getElementById('addPromocaoForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = {
+          nome: formData.get('nome'),
+          tipo: formData.get('tipo'),
+          produto_id: formData.get('tipo') === 'quantidade' ? formData.get('produto_id') : formData.get('produto_id_combo'),
+          quantidade_minima: formData.get('tipo') === 'quantidade' ? parseFloat(formData.get('quantidade_minima')) : null,
+          preco_promocional: parseFloat(formData.get('preco_promocional')),
+          produto_id_secundario: formData.get('tipo') === 'combo' ? formData.get('produto_id_secundario') : null,
+          data_inicio: formData.get('data_inicio') || null,
+          data_fim: formData.get('data_fim') || null,
+          ativa: formData.get('ativa') === 'on' ? 1 : 0
+        };
+        try {
+          const response = await fetch('/promocoes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (!response.ok) throw new Error('Erro ao criar promoção');
+          mostrarNotificacao('Promoção criada com sucesso!', 'is-success');
+          closeModal('addPromocaoModal');
+          e.target.reset();
+          togglePromocaoFields();
+          loadPromocoes();
+        } catch (err) {
+          mostrarNotificacao('Erro ao criar promoção: ' + err.message, 'is-danger');
+        }
+      });
+
+      // Manipular formulário de editar promoção
+      document.getElementById('editPromocaoForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = {
+          id: formData.get('id'),
+          nome: formData.get('nome'),
+          tipo: formData.get('tipo'),
+          produto_id: formData.get('tipo') === 'quantidade' ? formData.get('produto_id') : formData.get('produto_id_combo'),
+          quantidade_minima: formData.get('tipo') === 'quantidade' ? parseFloat(formData.get('quantidade_minima')) : null,
+          preco_promocional: parseFloat(formData.get('preco_promocional')),
+          produto_id_secundario: formData.get('tipo') === 'combo' ? formData.get('produto_id_secundario') : null,
+          data_inicio: formData.get('data_inicio') || null,
+          data_fim: formData.get('data_fim') || null,
+          ativa: formData.get('ativa') === 'on' ? 1 : 0
+        };
+        try {
+          const response = await fetch(`/promocoes/${data.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (!response.ok) throw new Error('Erro ao atualizar promoção');
+          mostrarNotificacao('Promoção atualizada com sucesso!', 'is-success');
+          closeModal('editPromocaoModal');
+          loadPromocoes();
+        } catch (err) {
+          mostrarNotificacao('Erro ao atualizar promoção: ' + err.message, 'is-danger');
+        }
+      });
+
+      // Inicializar página
+      document.addEventListener('DOMContentLoaded', () => {
+        const usuario = localStorage.getItem('usuario');
+        const permissao = localStorage.getItem('permissao');
+        if (!usuario || !permissao) {
+          mostrarNotificacao('Você não está autenticado! Redirecionando para o login...', 'is-danger');
+          setTimeout(() => {
+            window.location.href = '../login.html';
+          }, 2000);
+          return;
+        }
+        if (permissao !== 'admin') {
+          mostrarNotificacao('Você não tem permissão para acessar essa área!', 'is-danger');
+          setTimeout(() => {
+            window.location.href = '../login.html';
+          }, 2000);
+          return;
+        }
+        loadProdutos();
+        loadPromocoes();
+      });
+    </script>
+  </body>
+</html>

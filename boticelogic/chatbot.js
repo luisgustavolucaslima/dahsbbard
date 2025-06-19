@@ -198,18 +198,23 @@ bot.on('contact', async (msg) => {
     usuario_id: null,
     cargo: null,
     lastUpdated: Date.now(),
-    messageIds: []
+    messageIds: [],
+    cadastroEstado: null // Novo campo para rastrear o estado do cadastro
   };
   try {
-    const [usuarios] = await queryWithTimeout('SELECT id FROM usuarios WHERE chat_id = ?', [chatId]);
+    const [usuarios] = await queryWithTimeout('SELECT id, numero FROM usuarios WHERE chat_id = ?', [chatId]);
     if (!usuarios.length) {
       console.error(`[ERROR] Usuário não encontrado para chatId ${chatId}`);
-      return enviarMensagem(chatId, '⚠️ *Usuário não encontrado. Tente registrar novamente.*');
+      return enviarMensagem(chatId, '⚠️ *Usuário não encontrado. Envie a senha mestre para registrar.*');
+    }
+    if (usuarios[0].numero) {
+      console.log(`[DEBUG] Número já cadastrado para chatId ${chatId}: ${usuarios[0].numero}`);
+      return enviarMensagem(chatId, '⚠️ *Número já cadastrado. Envie sua senha pessoal para continuar.*');
     }
     console.log(`[DEBUG] Atualizando número ${phoneNumber} para chatId ${chatId}`);
-    const [result] = await queryWithTimeout('UPDATE usuarios SET numero = ? WHERE chat_id = ?', [phoneNumber, chatId]);
-    console.log(`[DEBUG] Resultado da query:`, result);
+    await queryWithTimeout('UPDATE usuarios SET numero = ? WHERE chat_id = ?', [phoneNumber, chatId]);
     sessao.usuario_id = usuarios[0].id;
+    sessao.cadastroEstado = 'aguardando_senha'; // Atualiza o estado para aguardar senha
     sessao.lastUpdated = Date.now();
     sessoes.set(chatId, sessao);
     await enviarMensagem(chatId, `✅ *Número ${phoneNumber} salvo com sucesso!* Agora, envie sua *senha pessoal* (mínimo 4 caracteres).`);
@@ -235,7 +240,8 @@ bot.on('message', async (msg) => {
     usuario_id: null,
     cargo: null,
     lastUpdated: Date.now(),
-    messageIds: []
+    messageIds: [],
+    cadastroEstado: null
   };
   // Armazenar message_id da mensagem do usuário
   sessao.messageIds = sessao.messageIds || [];
@@ -253,7 +259,8 @@ bot.on('message', async (msg) => {
       usuario_id: null,
       cargo: null,
       lastUpdated: Date.now(),
-      messageIds: []
+      messageIds: [],
+      cadastroEstado: null
     };
   }
   // Verifica timeout de sessão
@@ -262,6 +269,8 @@ bot.on('message', async (msg) => {
     return enviarMensagem(chatId, '🕒 *Sessão expirada. Envie sua senha pessoal para continuar.*');
   }
   sessao.lastUpdated = Date.now();
+  sessoes.set(chatId, sessao);
+
   // Consulta usuários
   let usuarios;
   try {
@@ -270,37 +279,50 @@ bot.on('message', async (msg) => {
     console.error(`[ERROR] Erro ao consultar usuários para ${chatId}:`, err.message);
     return enviarMensagem(chatId, '⚠️ *Erro ao acessar o sistema. Tente novamente.*');
   }
+
   // NOVO USUÁRIO
   if (!usuarios.length) {
     if (!msg.text || msg.text !== SENHA_MESTRE) {
       return enviarMensagem(chatId, '🔒 *Envie a senha de acesso para se registrar.*');
     }
     try {
+      // Verifica novamente para evitar corrida (race condition)
+      const [existingUsers] = await queryWithTimeout('SELECT id FROM usuarios WHERE chat_id = ?', [chatId]);
+      if (existingUsers.length) {
+        console.log(`[DEBUG] Usuário já existe para chatId ${chatId}, evitando duplicação`);
+        sessao.usuario_id = existingUsers[0].id;
+        sessao.cadastroEstado = 'aguardando_numero';
+        sessoes.set(chatId, sessao);
+        return solicitarNumeroTelefone(chatId);
+      }
       const [result] = await queryWithTimeout(
         'INSERT INTO usuarios (chat_id, senha, cargo, ultima_sessao, data_registro) VALUES (?, ?, ?, ?, ?)',
         [chatId, null, null, hoje, hoje]
       );
       sessao.usuario_id = result.insertId;
-      sessao.cargo = null;
+      sessao.cadastroEstado = 'aguardando_numero';
       sessao.lastUpdated = Date.now();
       sessoes.set(chatId, sessao);
       await solicitarNumeroTelefone(chatId);
-      return enviarMensagem(chatId, '✅ *Acesso liberado!* Compartilhe seu número e envie sua senha pessoal para completar o cadastro.');
+      return enviarMensagem(chatId, '✅ *Acesso liberado!* Compartilhe seu número para continuar o cadastro.');
     } catch (err) {
       console.error(`[ERROR] Erro ao criar usuário para ${chatId}:`, err.message);
+      if (err.code === 'ER_DUP_ENTRY') {
+        console.log(`[DEBUG] Tentativa de duplicação detectada para chatId ${chatId}`);
+        return enviarMensagem(chatId, '⚠️ *Usuário já registrado. Envie seu número de telefone ou senha pessoal.*');
+      }
       return enviarMensagem(chatId, '⚠️ *Erro ao registrar usuário. Tente novamente.*');
     }
   }
+
   const usuario = usuarios[0];
   sessao.usuario_id = usuario.id;
   sessao.cargo = usuario.cargo;
   sessao.nome = usuario.nome;
+  sessoes.set(chatId, sessao);
+
   // USUÁRIO EXISTE MAS SEM SENHA
-  if (!usuario.senha) {
-    if (!usuario.numero) {
-      await solicitarNumeroTelefone(chatId);
-      return enviarMensagem(chatId, '❗ *Compartilhe seu número de telefone antes de definir a senha.*');
-    }
+  if (!usuario.senha && sessao.cadastroEstado === 'aguardando_senha') {
     if (!msg.text || msg.text.length < 4) {
       return enviarMensagem(chatId, '❗ *A senha deve ter pelo menos 4 caracteres.*');
     }
@@ -310,6 +332,7 @@ bot.on('message', async (msg) => {
         [msg.text, hoje, chatId]
       );
       sessao.logado = true;
+      sessao.cadastroEstado = null; // Reseta o estado de cadastro
       sessao.lastUpdated = Date.now();
       sessoes.set(chatId, sessao);
       return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
@@ -318,6 +341,13 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '⚠️ *Erro ao salvar senha. Tente novamente.*');
     }
   }
+
+  // USUÁRIO EXISTE MAS SEM NÚMERO
+  if (!usuario.numero) {
+    await solicitarNumeroTelefone(chatId);
+    return enviarMensagem(chatId, '❗ *Compartilhe seu número de telefone antes de definir a senha.*');
+  }
+
   // VERIFICAÇÃO DE SENHA PESSOAL
   if (!sessao.logado) {
     if (!msg.text) {
@@ -345,6 +375,7 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '⚠️ *Erro ao verificar senha. Tente novamente.*');
     }
   }
+
   // AUTENTICAÇÃO DO SETOR
   if (sessao.setor && !sessao.autenticado) {
     if (!msg.text || !msg.text.trim()) {
@@ -380,6 +411,7 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '⚠️ *Erro ao autenticar setor. Tente novamente.*');
     }
   }
+
   // EXECUTA O FLUXO DO SETOR
   if (sessao.autenticado && sessao.setor) {
     try {
@@ -397,6 +429,7 @@ bot.on('message', async (msg) => {
       return enviarMensagem(chatId, '⚠️ *Erro ao processar sua solicitação. Tente novamente.*');
     }
   }
+
   return enviarMenuSetores(chatId, sessao.cargo, enviarMensagem);
 });
 

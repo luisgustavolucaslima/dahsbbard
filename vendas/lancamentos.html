@@ -7,13 +7,11 @@
   <title>Lancamentos</title>
   <link rel="stylesheet" href="css/main.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
 </head>
-<script>  let currentPage = 1;
-
-  const itemsPerPage = 10;
-</script>
 <body>
 <div id="app">
   <nav id="navbar-main" class="navbar is-fixed-top">
@@ -38,26 +36,29 @@
   <aside class="aside is-placed-left is-expanded">
     <div class="aside-tools">
       <div class="aside-tools-label">
-        <span><b>Admin</b></span>
+        <span><b>Gerente de Vendas</b></span>
       </div>
     </div>
-   <div class="menu is-menu-main">
-        <p class="menu-label">Geral</p>
-        <ul class="menu-list">
+    <div class="menu is-menu-main">
+      <p class="menu-label">Geral</p>
+      <ul class="menu-list">
         <li><a href="index.html" class="has-icon"><span class="icon"><i class="mdi mdi-desktop-mac"></i></span><span class="menu-item-label">Dashboard</span></a></li>
         <li><a href="estoque.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Estoque</span></a></li>
-        <li><a href="lancamentos.html" class="is-active  has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
-        <li><a href="entregas.html" class=" has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
-        <li><a href="conferencia.html" class=" has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Conferencia</span></a></li>
-        </ul>
-       <p class="menu-label">Logic Ice</p>
-        </div>
+        <li><a href="lancamentos.html" class="is-active has-icon"><span class="icon"><i class="mdi mdi-cash-multiple"></i></span><span class="menu-item-label">Lancamentos</span></a></li>
+        <li><a href="entregas.html" class="has-icon"><span class="icon"><i class="mdi mdi-truck-delivery"></i></span><span class="menu-item-label">Entregas</span></a></li>
+        <li><a href="conferencia.html" class="has-icon"><span class="icon"><i class="mdi mdi-warehouse"></i></span><span class="menu-item-label">Conferencia</span></a></li>
+      </ul>
+      <p class="menu-label">Logic Ice</p>
+      <ul class="menu-list">
+        <!-- Adicione itens adicionais aqui, se necessário -->
+      </ul>
+    </div>
   </aside>
   <section class="section is-title-bar">
     <div class="level">
       <div class="level-left">
         <div class="level-item">
-          <ul><li>Admin</li><li>Lancamentos</li></ul>
+          <ul><li>Gerente de Vendas</li><li>Lancamentos</li></ul>
         </div>
       </div>
     </div>
@@ -83,8 +84,6 @@
           <div class="field is-grouped mb-4">
             <div class="control">
               <button id="addLancamentoBtn" class="button is-primary">Adicionar Lançamento</button>
-            </div>
-            <div class="control">
             </div>
             <div class="control">
               <button id="refreshBtn" class="button is-light">Atualizar</button>
@@ -135,24 +134,23 @@
               </div>
             </div>
           </form>
-         <div class="table-container">
-          <table class="table is-fullwidth is-striped is-hoverable" id="lancamentosTable">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Descrição</th>
-                <th>Valor</th>
-                <th>Categoria</th>
-                <th>Tipo</th>
-                <th>Data do Lançamento</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="lancamentosTableBody"></tbody>
-          </table>
-        </div>
-        <div id="pagination" class="mt-4"></div>
-          
+          <div class="table-container">
+            <table class="table is-fullwidth is-striped is-hoverable" id="lancamentosTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Descrição</th>
+                  <th>Valor</th>
+                  <th>Categoria</th>
+                  <th>Tipo</th>
+                  <th>Data do Lançamento</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="lancamentosTableBody"></tbody>
+            </table>
+          </div>
+          <div id="pagination" class="mt-4"></div>
         </div>
       </div>
     </div>
@@ -210,15 +208,14 @@
               </div>
               <p class="help">Selecione a data do lançamento.</p>
             </div>
-          </form>
-          <div class="field">
-            <label class="label">Valor</label>
-            <div class="control">
-              <input class="input" type="number" step="0.01" id="registerValor" placeholder="Ex: 150.00">
+            <div class="field">
+              <label class="label">Valor</label>
+              <div class="control">
+                <input class="input" type="number" step="0.01" id="registerValor" placeholder="Ex: 150.00">
+              </div>
+              <p class="help">Informe o valor do lançamento (opcional).</p>
             </div>
-            <p class="help">Informe o valor do lançamento (opcional).</p>
-          </div>
-
+          </form>
         </section>
         <footer class="modal-card-foot">
           <button class="button is-success" onclick="salvarRegistroLancamento()">Registrar</button>
@@ -287,18 +284,18 @@
               </div>
               <p class="help">Selecione a data do lançamento.</p>
             </div>
+            <div class="field">
+              <label class="label">Valor</label>
+              <div class="control">
+                <input class="input" type="number" step="0.01" id="editValor" placeholder="Ex: 150.00">
+              </div>
+              <p class="help">Informe o valor do lançamento (opcional).</p>
+            </div>
           </form>
-          <div class="field">
-          <label class="label">Valor</label>
-          <div class="control">
-            <input class="input" type="number" step="0.01" id="editValor" placeholder="Ex: 150.00">
-          </div>
-          <p class="help">Informe o valor do lançamento (opcional).</p>
-        </div>
-
         </section>
         <footer class="modal-card-foot">
           <button class="button is-success" onclick="salvarEdicaoRegistro()">Salvar Alterações</button>
+          <button class="button is-danger" onclick="confirmarDelecaoRegistro()">Deletar</button>
           <button class="button" onclick="closeEditModal()">Cancelar</button>
         </footer>
       </div>
@@ -323,41 +320,13 @@
     </div>
   </section>
 
-  <style>
-    .table-container {
-      max-height: 400px;
-      overflow-y: auto;
-      margin-top: 1rem;
-    }
-    .table th, .table td {
-      padding: 0.75rem;
-      text-align: left;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .table th {
-      background-color: #f3f4f6;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .field.is-horizontal.is-spaced .field-body .field {
-      margin-bottom: 0.75rem;
-    }
-    .modal-card-body {
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-    .has-background-danger-light {
-      background-color: #fff5f5;
-    }
-  </style>
   <footer class="footer">
-    <div class="container-fluid">
+    <div class="container">
       <div class="level">
         <div class="level-left">
           <div class="level-item">© 2025, M</div>
           <div class="level-item">
-            <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999">
+            <img src="https://img.shields.io/github/v/release/vikdiesel/admin-one-bulma-dashboard?color=%23999" alt="Release">
           </div>
         </div>
         <div class="level-right"><div class="level-item"></div></div>
@@ -365,23 +334,38 @@
     </div>
   </footer>
 </div>
-<script type="text/javascript" src="js/main.min.js"></script>
-<link rel="stylesheet" href="https://cdn.materialdesignicons.com/4.9.95/css/materialdesignicons.min.css">
-<script>
 
+<script type="text/javascript" src="js/main.min.js"></script>
+<script>
+  let currentPage = 1;
+  const itemsPerPage = 10;
+
+  // Função para escapar HTML para prevenir XSS
+  function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
 
   // Função para formatar datas
   function formatarData(data) {
     try {
       if (!data) return '-';
-      const d = new Date(data);
+      // Tenta parsing como ISO (YYYY-MM-DD)
+      let d = new Date(data);
       if (isNaN(d.getTime())) {
-        const parts = data.split('-');
+        // Tenta parsing como DD/MM/YYYY
+        const parts = data.split('/');
         if (parts.length === 3) {
-          const d = new Date(parts[0], parts[1] - 1, parts[2]);
-          if (!isNaN(d.getTime())) return d.toLocaleDateString('pt-BR');
+          d = new Date(parts[2], parts[1] - 1, parts[0]);
+        } else {
+          // Tenta parsing como YYYY-MM-DD
+          const partsDash = data.split('-');
+          if (partsDash.length === 3) {
+            d = new Date(partsDash[0], partsDash[1] - 1, partsDash[2]);
+          }
         }
-        throw new Error('Data inválida');
+        if (isNaN(d.getTime())) throw new Error('Data inválida');
       }
       return d.toLocaleDateString('pt-BR');
     } catch (error) {
@@ -426,7 +410,7 @@
     const query = new URLSearchParams(filtros).toString();
     console.log('Filtros enviados:', filtros, 'Query:', query);
 
-    tbody.innerHTML = '<tr><td colspan="6" class="has-text-centered">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Carregando...</td></tr>';
     try {
       const response = await fetch(`http://localhost:3000/api/lancamentos?${query}`, {
         headers: { 'Accept': 'application/json' }
@@ -443,7 +427,7 @@
       tbody.innerHTML = '';
 
       if (data.lancamentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="has-text-centered">Nenhum lançamento encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Nenhum lançamento encontrado</td></tr>';
         pagination.innerHTML = '';
         return;
       }
@@ -452,11 +436,11 @@
         if (!lancamento.id || !lancamento.descricao) return;
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td>${lancamento.id}</td>
-          <td>${lancamento.descricao}</td>
-      <td>${lancamento.valor !== null && !isNaN(lancamento.valor) ? `R$ ${parseFloat(lancamento.valor).toFixed(2)}` : '-'}</td>
-          <td>${lancamento.categoria ? lancamento.categoria.charAt(0).toUpperCase() + lancamento.categoria.slice(1) : '-'}</td>
-          <td>${lancamento.tipo ? lancamento.tipo.charAt(0).toUpperCase() + lancamento.tipo.slice(1) : '-'}</td>
+          <td>${escapeHTML(lancamento.id.toString())}</td>
+          <td>${escapeHTML(lancamento.descricao)}</td>
+          <td>${lancamento.valor !== null && !isNaN(lancamento.valor) ? `R$ ${parseFloat(lancamento.valor).toFixed(2)}` : '-'}</td>
+          <td>${lancamento.categoria ? escapeHTML(lancamento.categoria.charAt(0).toUpperCase() + lancamento.categoria.slice(1)) : '-'}</td>
+          <td>${lancamento.tipo ? escapeHTML(lancamento.tipo.charAt(0).toUpperCase() + lancamento.tipo.slice(1)) : '-'}</td>
           <td>${formatarData(lancamento.data_lancamento)}</td>
           <td><button class="button is-small is-info" onclick='abrirEditModal(${JSON.stringify(lancamento)})'>Editar</button></td>`;
         tbody.appendChild(row);
@@ -465,7 +449,7 @@
       renderPagination(data.page, data.totalPages, data.total);
     } catch (error) {
       console.error('Erro ao atualizar lançamentos:', error);
-      tbody.innerHTML = '<tr><td colspan="6" class="has-text-centered">Erro ao carregar lançamentos: ' + error.message + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="has-text-centered">Erro ao carregar lançamentos: ' + escapeHTML(error.message) + '</td></tr>';
       pagination.innerHTML = '';
       mostrarNotificacao('Erro ao carregar lançamentos: ' + error.message, 'is-danger');
     }
@@ -521,27 +505,25 @@
 
   // Função para mudar de página
   function changePage(page) {
-  currentPage = page;
-  const filtros = {
-    descricao: document.getElementById('filtroDescricao')?.value || '',
-    categoria: document.getElementById('filtroCategoria')?.value || '',
-    tipo: document.getElementById('filtroTipo')?.value || ''
-  };
-  atualizarLancamentos(filtros);
-}
-
+    currentPage = page;
+    const filtros = {
+      descricao: document.getElementById('filtroDescricao')?.value || '',
+      categoria: document.getElementById('filtroCategoria')?.value || '',
+      tipo: document.getElementById('filtroTipo')?.value || ''
+    };
+    atualizarLancamentos(filtros);
+  }
 
   // Função para filtrar lançamentos
   function filtrarLancamentos() {
-  currentPage = 1;
-  const filtros = {
-    descricao: document.getElementById('filtroDescricao')?.value || '',
-    categoria: document.getElementById('filtroCategoria')?.value || '',
-    tipo: document.getElementById('filtroTipo')?.value || ''
-  };
-  atualizarLancamentos(filtros);
-}
-
+    currentPage = 1;
+    const filtros = {
+      descricao: document.getElementById('filtroDescricao')?.value || '',
+      categoria: document.getElementById('filtroCategoria')?.value || '',
+      tipo: document.getElementById('filtroTipo')?.value || ''
+    };
+    atualizarLancamentos(filtros);
+  }
 
   // Função para abrir modal de registro
   function openRegisterModal() {
@@ -578,7 +560,6 @@
       tipo: document.getElementById('registerTipo')?.value || null,
       data_lancamento: document.getElementById('registerDataLancamento')?.value,
       valor: parseFloat(document.getElementById('registerValor')?.value) || null
-
     };
 
     if (!lancamento.descricao || !lancamento.data_lancamento) {
@@ -616,7 +597,25 @@
     document.getElementById('editDescricao').value = lancamento.descricao;
     document.getElementById('editCategoria').value = lancamento.categoria || '';
     document.getElementById('editTipo').value = lancamento.tipo || '';
-    document.getElementById('editDataLancamento').value = lancamento.data_lancamento.split('T')[0];
+    document.getElementById('editValor').value = lancamento.valor !== null ? parseFloat(lancamento.valor).toFixed(2) : '';
+    // Formatar data para input type="date"
+    let dataFormatada = '';
+    if (lancamento.data_lancamento) {
+      try {
+        const d = new Date(lancamento.data_lancamento);
+        if (!isNaN(d.getTime())) {
+          dataFormatada = d.toISOString().split('T')[0];
+        } else {
+          const parts = lancamento.data_lancamento.split('/');
+          if (parts.length === 3) {
+            dataFormatada = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao formatar data para edição:', e);
+      }
+    }
+    document.getElementById('editDataLancamento').value = dataFormatada;
     modal.classList.add('is-active');
   }
 
@@ -642,7 +641,6 @@
       tipo: document.getElementById('editTipo')?.value || null,
       data_lancamento: document.getElementById('editDataLancamento')?.value,
       valor: parseFloat(document.getElementById('editValor')?.value) || null
-
     };
 
     if (!id || !lancamento.descricao || !lancamento.data_lancamento) {

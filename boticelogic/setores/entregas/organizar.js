@@ -677,51 +677,60 @@ async function tratarCallbackOrganizarRota(query, sessao, db, bot, chatId, sesso
     }
 
     if (data.startsWith('detalhes_pedido_')) {
-      await bot.answerCallbackQuery(query.id);
-      const pedidoId = parseInt(data.split('_')[2]);
-      const [[entrega]] = await db.query(`
-        SELECT e.id, e.cliente_numero, e.endereco, v.forma_pagamento, v.valor_total
-        FROM entregas e
-        JOIN pedidos_diarios p ON e.pedido_id = p.id
-        JOIN vendas v ON p.venda_id = v.id
-        WHERE e.id = ? AND e.entregador_id = ?
-      `, [pedidoId, sessao.usuario_id]);
+  await bot.answerCallbackQuery(query.id);
+  const pedidoId = parseInt(data.split('_')[2]);
+  const [[entrega]] = await db.query(`
+    SELECT e.id, e.cliente_numero, e.endereco, v.forma_pagamento, v.valor_total, v.valor_pago
+    FROM entregas e
+    JOIN pedidos_diarios p ON e.pedido_id = p.id
+    JOIN vendas v ON p.venda_id = v.id
+    WHERE e.id = ? AND e.entregador_id = ?
+  `, [pedidoId, sessao.usuario_id]);
 
-      if (!entrega) {
-        await enviarMensagem(chatId, '❌ *Pedido não encontrado ou não atribuído a você.*', {
-          reply_markup: getSubmenuOrganizarRota()
-        });
-        return true;
-      }
+  if (!entrega) {
+    await enviarMensagem(chatId, '❌ *Pedido não encontrado ou não atribuído a você.*', {
+      reply_markup: getSubmenuOrganizarRota()
+    });
+    return true;
+  }
 
-      // Geocodificar o endereço para gerar o link do Google Maps
-      const coords = await geocodeAddress(entrega.endereco);
-      let mapsLink = '';
-      if (coords) {
-        mapsLink = `https://www.google.com/maps?q=${coords.lat},${coords.lng}`;
-      } else {
-        mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(entrega.endereco + ', ' + CIDADE_REFERENCIA)}`;
-      }
+  // Geocodificar o endereço para gerar o link do Google Maps
+  const coords = await geocodeAddress(entrega.endereco);
+  let mapsLink = '';
+  if (coords) {
+    mapsLink = `https://www.google.com/maps?q=${coords.lat},${coords.lng}`;
+  } else {
+    mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(entrega.endereco + ', ' + CIDADE_REFERENCIA)}`;
+  }
 
-      const mensagemDetalhes = [
-        `📦 *Detalhes do Pedido #${pedidoId}*`,
-        `📞 ${entrega.cliente_numero}`,
-        `📍 ${entrega.endereco.replace(/\*/g, '').replace(/_/g, '')}`,
-        `💳 ${entrega.forma_pagamento}: R$ ${parseFloat(entrega.valor_total).toFixed(2)}`
-      ].join('\n');
+  // Determinar o valor a ser exibido
+  let valorExibir = '';
+  if (entrega.forma_pagamento === 'dinheiro') {
+    valorExibir = `💵 R$ ${parseFloat(entrega.valor_total).toFixed(2)}`;
+  } else if (entrega.forma_pagamento === 'pix+dinheiro') {
+    const valorRestante = entrega.valor_total - (entrega.valor_pago || 0);
+    valorExibir = `💵 R$ ${parseFloat(valorRestante).toFixed(2)}`;
+  }
 
-      await enviarMensagem(chatId, mensagemDetalhes, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '🗺️ Abrir Localização', url: mapsLink }],
-            [{ text: '✅ Receber', callback_data: `receber_pedido_${pedidoId}` }, { text: '❌ Negar', callback_data: `negar_pedido_${pedidoId}` }],
-            [{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]
-          ]
-        },
-        parse_mode: 'Markdown'
-      });
-      return true;
-    }
+  const mensagemDetalhes = [
+    `📦 *Detalhes do Pedido #${pedidoId}*`,
+    `📞 ${entrega.cliente_numero}`,
+    `📍 ${entrega.endereco.replace(/\*/g, '').replace(/_/g, '')}`,
+    ...(valorExibir ? [valorExibir] : [])
+  ].join('\n');
+
+  await enviarMensagem(chatId, mensagemDetalhes, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🗺️ Abrir Localização', url: mapsLink }],
+        [{ text: '✅ Receber', callback_data: `receber_pedido_${pedidoId}` }, { text: '❌ Negar', callback_data: `negar_pedido_${pedidoId}` }],
+        [{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]
+      ]
+    },
+    parse_mode: 'Markdown'
+  });
+  return true;
+}
 
     if (data.startsWith('receber_pedido_')) {
       await bot.answerCallbackQuery(query.id);

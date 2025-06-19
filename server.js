@@ -52,6 +52,36 @@ app.get('/pedidos_diarios', async (req, res) => {
   }
 });
 
+app.get('/pedidos_entrega', async (req, res) => {
+  try {
+    const [pedidos] = await db.query(`
+              SELECT 
+          pd.id, 
+          pd.cliente_numero, 
+          pd.status, 
+          pd.valido, 
+          pd.data_hora, 
+          pd.numero_diario, 
+          pd.data, 
+          pd.recebido, 
+          pd.venda_id,
+          GROUP_CONCAT(CONCAT(pi.quantidade, ' x ', e.nome)) as produtos,
+          v.valor_total,
+          ROW_NUMBER() OVER (ORDER BY pd.data_hora ASC) as pedido_numero
+        FROM pedidos_diarios pd
+        LEFT JOIN vendas v ON pd.venda_id = v.id
+        LEFT JOIN pedido_itens pi ON pi.pedido_id = pd.id
+        LEFT JOIN estoque e ON pi.produto_id = e.id
+        GROUP BY pd.id
+        ORDER BY pd.data_hora ASC
+    `);
+    res.json(pedidos);
+  } catch (err) {
+    console.error("Erro ao buscar pedidos:", err);
+    res.status(500).json({ erro: 'Erro ao buscar pedidos' });
+  }
+});
+
 app.get('/api/produtos', async (req, res) => {
   try {
     const [produtos] = await db.query('SELECT id, nome, valor_unitario FROM estoque');
@@ -1910,6 +1940,80 @@ app.get('/api/pedidos_pendentes', async (req, res) => {
   } catch (err) {
     console.error('Erro ao buscar pedidos pendentes:', err);
     res.status(500).json({ erro: 'Erro ao buscar pedidos pendentes' });
+  }
+});
+
+// GET /api/promocoes - Listar todas as promoções
+app.get('/promocoes', async (req, res) => {
+  try {
+    const [promocoes] = await db.query(`
+      SELECT p.*, e1.nome AS produto_nome, e2.nome AS produto_secundario_nome
+      FROM promocoes p
+      LEFT JOIN estoque e1 ON p.produto_id = e1.id
+      LEFT JOIN estoque e2 ON p.produto_id_secundario = e2.id
+    `);
+    res.json(promocoes);
+  } catch (err) {
+    console.error('[ERROR] Erro ao listar promoções:', err.message);
+    res.status(500).json({ error: 'Erro ao listar promoções' });
+  }
+});
+
+// GET /api/produtos - Listar produtos para os selects
+app.get('/produtos', async (req, res) => {
+  try {
+    const [produtos] = await db.query('SELECT id, nome FROM estoque WHERE quantidade > 0');
+    res.json(produtos);
+  } catch (err) {
+    console.error('[ERROR] Erro ao listar produtos:', err.message);
+    res.status(500).json({ error: 'Erro ao listar produtos' });
+  }
+});
+
+// POST /api/promocoes - Criar uma nova promoção
+app.post('/promocoes', async (req, res) => {
+  const { nome, tipo, produto_id, quantidade_minima, preco_promocional, produto_id_secundario, data_inicio, data_fim, ativa } = req.body;
+  try {
+    await db.query(
+      `INSERT INTO promocoes (nome, tipo, produto_id, quantidade_minima, preco_promocional, produto_id_secundario, data_inicio, data_fim, ativa)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nome, tipo, produto_id || null, quantidade_minima || null, preco_promocional, produto_id_secundario || null, data_inicio || null, data_fim || null, ativa]
+    );
+    res.status(201).json({ message: 'Promoção criada com sucesso' });
+  } catch (err) {
+    console.error('[ERROR] Erro ao criar promoção:', err.message);
+    res.status(500).json({ error: 'Erro ao criar promoção' });
+  }
+});
+
+// PUT /api/promocoes/:id - Atualizar uma promoção
+app.put('/promocoes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nome, tipo, produto_id, quantidade_minima, preco_promocional, produto_id_secundario, data_inicio, data_fim, ativa } = req.body;
+  try {
+    await db.query(
+      `UPDATE promocoes
+       SET nome = ?, tipo = ?, produto_id = ?, quantidade_minima = ?, preco_promocional = ?,
+           produto_id_secundario = ?, data_inicio = ?, data_fim = ?, ativa = ?
+       WHERE id = ?`,
+      [nome, tipo, produto_id || null, quantidade_minima || null, preco_promocional, produto_id_secundario || null, data_inicio || null, data_fim || null, ativa, id]
+    );
+    res.json({ message: 'Promoção atualizada com sucesso' });
+  } catch (err) {
+    console.error('[ERROR] Erro ao atualizar promoção:', err.message);
+    res.status(500).json({ error: 'Erro ao atualizar promoção' });
+  }
+});
+
+// DELETE /api/promocoes/:id - Excluir uma promoção
+app.delete('/promocoes/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query('DELETE FROM promocoes WHERE id = ?', [id]);
+    res.json({ message: 'Promoção excluída com sucesso' });
+  } catch (err) {
+    console.error('[ERROR] Erro ao excluir promoção:', err.message);
+    res.status(500).json({ error: 'Erro ao excluir promoção' });
   }
 });
 

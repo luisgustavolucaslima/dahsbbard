@@ -1094,7 +1094,7 @@ async function carregarEntregadores() {
 }
 
 async function carregarPedidosParaEntrega() {
-  const res = await fetch('/pedidos_diarios');
+  const res = await fetch('/pedidos_entrega');
   const pedidos = await res.json();
   const lista = pedidos.filter(p => p.status === 'entrega');
   const container = document.getElementById('listaPedidosEntrega');

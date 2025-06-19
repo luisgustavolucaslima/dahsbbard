@@ -515,7 +515,7 @@ if (texto === 'finalizar_rota' || (msg && msg.data === 'finalizar_rota')) {
         const valor = venda.forma_pagamento === 'pix+dinheiro' && venda.valor_dinheiro ? venda.valor_dinheiro : venda.valor_total;
         return sum + (valor || 0);
       }, 0);
-      await enviarMensagem(chatId, `💵 *Valores a Receber (Dinheiro/Pix+Dinheiro):*\n\n${lista}\n\n*Total*: R$ ${total}`, {
+      await enviarMensagem(chatId, `💵 *Valores a Receber (Dinheiro/Pix+Dinheiro):*\n\n${lista}\n\n`, {
         reply_markup: {
           inline_keyboard: [[{ text: '⬅️ Voltar', callback_data: 'voltar_menu' }, { text: '🛑 Sair', callback_data: 'sair' }]]
         }
