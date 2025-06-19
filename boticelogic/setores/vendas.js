@@ -1,7 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-
+const puppeteer = require('puppeteer');
 // Função para escapar caracteres especiais no Markdown
 const escapeMarkdown = (text) => {
   if (!text) return text || 'Não informado';
@@ -267,67 +267,245 @@ const handleCallbacks = async (query, sessao, bot, db, sessoes) => {
       }
     }
 
-    if (data === 'lista') {
-      const [categorias] = await db.query(`SELECT DISTINCT categoria FROM estoque WHERE quantidade > 0`);
-      const [promocoes] = await db.query(
-        `SELECT nome, tipo, preco_promocional, quantidade_minima, produto_id, produto_id_secundario
-         FROM promocoes WHERE ativa = 1 AND (data_inicio IS NULL OR data_inicio <= CURDATE())
-         AND (data_fim IS NULL OR data_fim >= CURDATE())`
+    // Função para gerar a imagem da lista
+async function gerarListaImagem(chatId, bot, db) {
+  try {
+    // Consultar categorias e promoções
+    const [categorias] = await db.query(`SELECT DISTINCT categoria FROM estoque WHERE quantidade > 0`);
+    const [promocoes] = await db.query(
+      `SELECT nome, tipo, preco_promocional, quantidade_minima, produto_id, produto_id_secundario
+       FROM promocoes WHERE ativa = 1 AND (data_inicio IS NULL OR data_inicio <= CURDATE())
+       AND (data_fim IS NULL OR data_fim >= CURDATE())`
+    );
+
+    // Cabeçalho
+    let conteudo = `
+      <div class="header">
+        <h1>Lista Exclusiva</h1>
+        <div class="divider">🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️</div>
+        <p><strong>NÃO REPASSE A LISTA!</strong></p>
+        <p><strong>ATENDIMENTO: 08:00 às 22:00</strong></p>
+        <p><strong>PAGAMENTO: Dinheiro ou PIX antecipado (com comprovante)</strong></p>
+        <p><strong>ENTREGA GRÁTIS</strong></p>
+      </div>
+      <div class="separator"></div>
+    `;
+
+    let produtoIndex = 1;
+
+    // Mapear emojis de categorias
+    const emojiCategoria = {
+      'POD/THC': '🌬️',
+      'FLOR/SKUNK/CAPULHO': '🪴',
+      'CRUMBLE/WAX/ROSIN': '🍯',
+      '#/@/⚡️': '🛞'
+    };
+
+    // Mapear subcategorias
+    const subcategorias = {
+      'Torch - Pebbles': 'Descartáveis',
+      'Elf - ELFTHC (Live Rosin 3g)': 'Descartáveis',
+      'Elf - ELFTHC (Live Rosin 1g)': 'Refil',
+      'Elf - ELFTHC (Caneta Recarregavel)': 'Caneta Recarregavel'
+    };
+
+    let ultimaSubcategoria = '';
+
+    for (const cat of categorias) {
+      const [produtos] = await db.query(
+        `SELECT id, nome, medida, quantidade, valor_unitario, sabores FROM estoque WHERE categoria = ? AND quantidade > 0`,
+        [cat.categoria]
       );
 
-      let mensagem = 
-`🚨 *NÃO REPASSE A LISTA!*\n
-🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️\n
-🕐 *ATENDIMENTO TODOS OS DIAS, DAS 08:00 às 22:00*\n
-🕐 *ENTREGA DE MANHÃ, MEIO DA TARDE, E FIM DA TARDE!*\n
-💸 *PIX SÓ ANTECIPADO! FAVOR ENVIAR O COMPROVANTE!*\n
-🔑 *ANTES DE FAZER O PIX PEÇA A CHAVE!*\n
-💵 *EVITE PIX! PREFERÊNCIA NO DINHEIRO!*\n
-🛒 *PEDIDO MÍNIMO R$50,00!*\n
-⚡ *ENTREGA GRÁTIS! ENTREGA RÁPIDA!*\n
-🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️\n
-`;
+      if (produtos.length > 0) {
+        conteudo += `<div class="categoria">${emojiCategoria[cat.categoria] || ''} ${cat.categoria}</div><div class="separator"></div>`;
 
-      for (const cat of categorias) {
-        const [produtos] = await db.query(
-          `SELECT id, nome, medida, quantidade, valor_unitario FROM estoque WHERE categoria = ? AND quantidade > 0`,
-          [cat.categoria]
-        );
+        for (const p of produtos) {
+          // Subcategoria
+          let subcategoria = subcategorias[p.nome] || '';
+          if (subcategoria && subcategoria !== ultimaSubcategoria) {
+            conteudo += `<div class="subcategoria">${subcategoria}</div>`;
+            ultimaSubcategoria = subcategoria;
+          }
 
-        if (produtos.length > 0) {
-          mensagem += `*${cat.categoria}\n\n*`;
-          for (const p of produtos) {
-            mensagem += `• ${p.nome} – R$${parseFloat(p.valor_unitario).toFixed(2)}\n`;
-            const promocoesProduto = promocoes.filter(promo => promo.produto_id === p.id && promo.tipo === 'quantidade');
-            for (const promo of promocoesProduto) {
-              mensagem += `  - Promoção: ${promo.quantidade_minima}${p.medida} por R$${parseFloat(promo.preco_promocional).toFixed(2)} cada\n`;
+          conteudo += `<div class="produto">(${String(produtoIndex).padStart(2, '0')}) • ${p.nome} ${p.medida ? `(${p.medida})` : ''}</div>`;
+          conteudo += `<div>R$${parseFloat(p.valor_unitario).toFixed(2)} ${p.medida || 'un'}</div>`;
+
+          // Promoções por quantidade
+          const promocoesProduto = promocoes.filter(promo => promo.produto_id === p.id && promo.tipo === 'quantidade');
+          for (const promo of promocoesProduto) {
+            conteudo += `<div class="promocao">${promo.quantidade_minima} ou mais R$${parseFloat(promo.preco_promocional).toFixed(2)} ${p.medida || 'un'}</div>`;
+          }
+
+          // Sabores
+          if (p.sabores) {
+            conteudo += `<div>(SABORES)</div>`;
+            const sabores = p.sabores.split(';');
+            for (const sabor of sabores) {
+              conteudo += `<div class="sabor">- ${sabor}</div>`;
             }
           }
-          mensagem += '\n';
+
+          conteudo += `<div class="spacer"></div>`;
+          produtoIndex++;
         }
       }
-
-      // Adicionar seção de combos
-      const combos = promocoes.filter(promo => promo.tipo === 'combo');
-      if (combos.length > 0) {
-        mensagem += `*Combos Promocionais*\n\n`;
-        for (const combo of combos) {
-          const [produto1] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id]);
-          const [produto2] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id_secundario]);
-          mensagem += `• ${combo.nome}: ${produto1[0].nome} + ${produto2[0].nome} por R$${parseFloat(combo.preco_promocional).toFixed(2)}\n`;
-        }
-        mensagem += '\n';
-      }
-
-      mensagem += 
-`🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️\n
-⚡ *Antecipe seu pedido, Evite ficar esperando.*`;
-
-      await bot.answerCallbackQuery(query.id);
-      await sendMessage(chatId, mensagem, bot);
-      sessao.etapa = null;
-      return showInitialMenu(chatId, sessao.nome, bot);
     }
+
+    // Seção de promoções (combos)
+    const combos = promocoes.filter(promo => promo.tipo === 'combo');
+    if (combos.length > 0) {
+      conteudo += `<div class="categoria">PROMOÇÃO!!</div><div class="separator"></div>`;
+      for (const combo of combos) {
+        const [produto1] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id]);
+        const [produto2] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id_secundario]);
+        conteudo += `<div class="produto">(${String(produtoIndex).padStart(2, '0')}) ✅ ${combo.nome}: ${produto1[0].nome} + ${produto2[0].nome}</div>`;
+        conteudo += `<div class="promocao">R$${parseFloat(combo.preco_promocional).toFixed(2)} ✅</div>`;
+        conteudo += `<div class="spacer"></div>`;
+        produtoIndex++;
+      }
+    }
+
+    // Rodapé
+    conteudo += `
+      <div class="separator"></div>
+      <div class="footer">
+        <div class="divider">🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️</div>
+        <p><strong>NÃO REPASSE A LISTA!</strong></p>
+        <p><strong>ATENDIMENTO: 08:00 às 22:00</strong></p>
+        <p><strong>PAGAMENTO: Dinheiro ou PIX antecipado (com comprovante)</strong></p>
+        <p><strong>ENTREGA GRÁTIS</strong></p>
+      </div>
+    `;
+
+    // HTML estilizado para a imagem
+    const html = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+        <style>
+          body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #1a73e8, #4a90e2);
+            padding: 15px;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+          }
+          .container {
+            background: #fff;
+            max-width: 400px;
+            border-radius: 15px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            color: #333;
+            font-size: 14px;
+            line-height: 1.4;
+          }
+          .header h1 {
+            font-size: 20px;
+            font-weight: 900;
+            color: #1a73e8;
+            text-align: center;
+            margin: 0 0 10px;
+            text-transform: uppercase;
+          }
+          .categoria {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a73e8;
+            margin: 10px 0 5px;
+          }
+          .subcategoria {
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+            margin: 8px 0 4px;
+          }
+          .produto {
+            font-weight: 700;
+            margin: 4px 0;
+          }
+          .promocao {
+            color: #34c759;
+            font-weight: 700;
+            margin: 2px 0;
+          }
+          .sabor {
+            color: #666;
+            margin: 2px 0;
+          }
+          .divider {
+            text-align: center;
+            color: #888;
+            font-size: 16px;
+            margin: 8px 0;
+          }
+          .separator {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #ccc, transparent);
+            margin: 8px 0;
+          }
+          .spacer {
+            height: 8px;
+          }
+          .footer {
+            margin-top: 10px;
+          }
+          p, div {
+            margin: 2px 0;
+          }
+          strong {
+            font-weight: 700;
+          }
+          .emoji {
+            font-size: 16px;
+            vertical-align: middle;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">${conteudo}</div>
+      </body>
+      </html>
+    `;
+
+    // Inicializar Puppeteer
+    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    await page.setContent(html);
+    await page.screenshot({ path: 'lista.png', fullPage: true });
+    await browser.close();
+
+    // Enviar a imagem via Telegram
+    await bot.sendPhoto(chatId, fs.readFileSync('lista.png'), {
+      caption: '📋 *Lista Exclusiva Atualizada*'
+    });
+
+    // Limpar arquivo
+    if (fs.existsSync('lista.png')) fs.unlinkSync('lista.png');
+
+    return true;
+  } catch (err) {
+    console.error('[ERROR] Erro ao gerar lista imagem:', err.message);
+    await bot.sendMessage(chatId, '⚠️ Erro ao gerar a lista. Tente novamente mais tarde.');
+    return false;
+  }
+}
+
+// Ajuste no trecho do if (data === 'lista')
+if (data === 'lista') {
+  await bot.answerCallbackQuery(query.id);
+  const sucesso = await gerarListaImagem(chatId, bot, db);
+  if (sucesso) {
+    sessao.etapa = null;
+    return showInitialMenu(chatId, sessao.nome, bot);
+  }
+}
 
     if (data === 'laranja') {
       const [laranja] = await db.query(`SELECT pix, qrcodex64 FROM laranja WHERE status = 1 LIMIT 1`);
