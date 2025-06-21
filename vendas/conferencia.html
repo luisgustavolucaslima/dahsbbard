@@ -379,7 +379,7 @@
               showNotification("Pedido não encontrado.", "warning");
               return;
             }
-            document.getElementById('infoId').textContent = p.pedido_id ?? p.id ?? id;
+            document.getElementById('infoId').textContent = p.numero_diario ?? p.id ?? id;
             document.getElementById('infoCliente').textContent = p.cliente_numero?.replace('@c.us', '') || "-";
             document.getElementById('infoProdutos').textContent = p.itens || p.produtos || "-";
             document.getElementById('infoValor').textContent = p.valor_total && p.valor_total !== "-" ? `R$ ${parseFloat(p.valor_total).toFixed(2)}` : "-";

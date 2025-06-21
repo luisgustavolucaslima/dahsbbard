@@ -587,7 +587,7 @@ function verComprovante(id) {
       // Verificação de Permissões
       document.addEventListener("DOMContentLoaded", () => {
         const permissao = localStorage.getItem('permissao');
-        if (permissao !== 'vendas') {
+        if (permissao !== 'vendas' && permissao !== 'admin')  {
           showNotification('Você não tem permissão para acessar essa área!', 'danger');
           setTimeout(() => { window.location.href = '../login.html'; }, 3000);
           return;
@@ -1145,7 +1145,7 @@ function informacoesDoPedido(id) {
       }
 
       document.getElementById('infoId').textContent =
-        p.pedido_id ?? p.id ?? id;
+        p.numero_diario ?? p.id ?? id;
 
       document.getElementById('infoCliente').textContent =
         p.cliente_numero?.replace('@c.us', '') || "-";

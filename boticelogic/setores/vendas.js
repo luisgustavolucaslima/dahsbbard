@@ -281,14 +281,11 @@ async function gerarListaImagem(chatId, bot, db) {
     // Cabeçalho
     let conteudo = `
       <div class="header">
-        <h1>Lista Exclusiva</h1>
-        <div class="divider">🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️</div>
-        <p><strong>NÃO REPASSE A LISTA!</strong></p>
-        <p><strong>ATENDIMENTO: 08:00 às 22:00</strong></p>
-        <p><strong>PAGAMENTO: Dinheiro ou PIX antecipado (com comprovante)</strong></p>
-        <p><strong>ENTREGA GRÁTIS</strong></p>
+        <h1>Catálogo Exclusivo</h1>
+        <p><i class="fas fa-clock icon"></i> 08h00 às 22h00</p>
+        <p><i class="fas fa-money-bill-wave icon"></i> Dinheiro ou PIX antecipado (com comprovante)</p>
+        <p><i class="fas fa-truck icon"></i> Entrega grátis</p>
       </div>
-      <div class="separator"></div>
     `;
 
     let produtoIndex = 1;
@@ -318,7 +315,8 @@ async function gerarListaImagem(chatId, bot, db) {
       );
 
       if (produtos.length > 0) {
-        conteudo += `<div class="categoria">${emojiCategoria[cat.categoria] || ''} ${cat.categoria}</div><div class="separator"></div>`;
+        conteudo += `<div class="categoria">${emojiCategoria[cat.categoria] || ''} ${cat.categoria}</div>`;
+        conteudo += `<hr>`;
 
         for (const p of produtos) {
           // Subcategoria
@@ -328,13 +326,16 @@ async function gerarListaImagem(chatId, bot, db) {
             ultimaSubcategoria = subcategoria;
           }
 
-          conteudo += `<div class="produto">(${String(produtoIndex).padStart(2, '0')}) • ${p.nome} ${p.medida ? `(${p.medida})` : ''}</div>`;
-          conteudo += `<div>R$${parseFloat(p.valor_unitario).toFixed(2)} ${p.medida || 'un'}</div>`;
+          conteudo += `<div class="produto-item">`;
+          conteudo += `<div class="produto-numero">${String(produtoIndex).padStart(2, '0')}</div><br>`;
+          conteudo += `<div class="produto-nome">${p.nome} ${p.medida ? `(${p.medida})` : ''}</div>`;
+          conteudo += `<div class="produto-preco">R$${parseFloat(p.valor_unitario).toFixed(2)}/un.</div>`;
+          conteudo += `</div>`;
 
           // Promoções por quantidade
           const promocoesProduto = promocoes.filter(promo => promo.produto_id === p.id && promo.tipo === 'quantidade');
           for (const promo of promocoesProduto) {
-            conteudo += `<div class="promocao">${promo.quantidade_minima} ou mais R$${parseFloat(promo.preco_promocional).toFixed(2)} ${p.medida || 'un'}</div>`;
+            conteudo += `<div class="promocao">• ${promo.quantidade_minima} ou mais: R$${parseFloat(promo.preco_promocional).toFixed(2)}</div>`;
           }
 
           // Sabores
@@ -355,12 +356,16 @@ async function gerarListaImagem(chatId, bot, db) {
     // Seção de promoções (combos)
     const combos = promocoes.filter(promo => promo.tipo === 'combo');
     if (combos.length > 0) {
-      conteudo += `<div class="categoria">PROMOÇÃO!!</div><div class="separator"></div>`;
+      conteudo += `<div class="categoria">Promoção Especial</div>`;
+      conteudo += `<hr>`;
       for (const combo of combos) {
         const [produto1] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id]);
         const [produto2] = await db.query(`SELECT nome FROM estoque WHERE id = ?`, [combo.produto_id_secundario]);
-        conteudo += `<div class="produto">(${String(produtoIndex).padStart(2, '0')}) ✅ ${combo.nome}: ${produto1[0].nome} + ${produto2[0].nome}</div>`;
-        conteudo += `<div class="promocao">R$${parseFloat(combo.preco_promocional).toFixed(2)} ✅</div>`;
+        conteudo += `<div class="produto-item">`;
+        conteudo += `<div class="produto-numero">${String(produtoIndex).padStart(2, '0')}</div>`;
+        conteudo += `<div class="produto-nome">✅ ${combo.nome}: ${produto1[0].nome} + ${produto2[0].nome}</div>`;
+        conteudo += `<div class="produto-preco">R$${parseFloat(combo.preco_promocional).toFixed(2)}</div>`;
+        conteudo += `</div>`;
         conteudo += `<div class="spacer"></div>`;
         produtoIndex++;
       }
@@ -368,7 +373,6 @@ async function gerarListaImagem(chatId, bot, db) {
 
     // Rodapé
     conteudo += `
-      <div class="separator"></div>
       <div class="footer">
         <div class="divider">🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️🏌🏼‍♂️</div>
         <p><strong>NÃO REPASSE A LISTA!</strong></p>
@@ -384,87 +388,125 @@ async function gerarListaImagem(chatId, bot, db) {
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Lista Exclusiva</title>
         <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
         <style>
+          * {
+            box-sizing: border-box;
+          }
           body {
             font-family: 'Nunito', sans-serif;
-            background: linear-gradient(135deg, #1a73e8, #4a90e2);
-            padding: 15px;
+            padding: 20px;
             margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             min-height: 100vh;
+            background: #ffffff;
           }
           .container {
-            background: #fff;
-            max-width: 400px;
-            border-radius: 15px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-            padding: 20px;
-            color: #333;
-            font-size: 14px;
-            line-height: 1.4;
+            background:rgba(0, 0, 0, 0.35);
+            max-width: 750px;
+            margin: 20px auto;
+            border-radius: 20px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            color: #264653;
+            font-size: 18px;
+            line-height: 1.8;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 20px;
           }
           .header h1 {
-            font-size: 20px;
+            font-size: 36px;
             font-weight: 900;
-            color: #1a73e8;
-            text-align: center;
-            margin: 0 0 10px;
+            color: #1a3c34;
+            margin: 0 0 15px;
             text-transform: uppercase;
           }
-          .categoria {
+          .header p {
+            margin: 5px 0;
             font-size: 16px;
-            font-weight: 700;
-            color: #1a73e8;
-            margin: 10px 0 5px;
           }
-          .subcategoria {
-            font-size: 14px;
-            font-weight: 700;
-            color: #333;
-            margin: 8px 0 4px;
+          .header .icon {
+            margin-right: 8px;
           }
-          .produto {
+          .categoria {
+            font-size: 24px;
             font-weight: 700;
-            margin: 4px 0;
+            color: #1a3c34;
+            margin: 20px 0 10px;
+          }
+          hr {
+            border: 0;
+            height: 1px;
+            background: #1a3c34;
+            margin: 15px 0;
+          }
+          .produto-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 10px 0;
+          }
+          .produto-numero {
+            font-weight: 700;
+            color: #1a3c34;
+            min-width: 50px;
+          }
+          .produto-nome {
+            flex-grow: 1;
+            font-weight: 700;
+            font-size: 20px;
+          }
+          .produto-preco {
+            font-weight: 700;
+            color: #264653;
+            font-size: 20px;
+            text-align: right;
           }
           .promocao {
-            color: #34c759;
-            font-weight: 700;
-            margin: 2px 0;
-          }
-          .sabor {
-            color: #666;
-            margin: 2px 0;
-          }
-          .divider {
-            text-align: center;
-            color: #888;
-            font-size: 16px;
-            margin: 8px 0;
-          }
-          .separator {
-            height: 1px;
-            background: linear-gradient(to right, transparent, #ccc, transparent);
-            margin: 8px 0;
+            color: #264653;
+            font-size: 18px;
+            margin-left: 60px;
+            margin-top: 4px;
           }
           .spacer {
-            height: 8px;
+            height: 20px;
           }
           .footer {
-            margin-top: 10px;
-          }
-          p, div {
-            margin: 2px 0;
-          }
-          strong {
-            font-weight: 700;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 16px;
+            color: #264653;
           }
           .emoji {
-            font-size: 16px;
+            font-size: 20px;
             vertical-align: middle;
+          }
+          @media (max-width: 480px) {
+            .container {
+              max-width: 100%;
+              padding: 25px;
+              margin: 10px;
+            }
+            .header h1 {
+              font-size: 32px;
+            }
+            .categoria {
+              font-size: 20px;
+            }
+            .produto-nome, .produto-preco {
+              font-size: 18px;
+            }
+            .promocao {
+              font-size: 16px;
+              margin-left: 50px;
+            }
+            .footer {
+              font-size: 14px;
+            }
           }
         </style>
       </head>

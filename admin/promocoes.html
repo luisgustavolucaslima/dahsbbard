@@ -164,7 +164,7 @@
                   <label class="label">Produto Secundário</label>
                   <div class="control">
                     <div class="select">
-                      <select name="produto_id_secundario" required>
+                      <select name="produto_id_secundario" >
                         <option value="">Selecione um produto</option>
                       </select>
                     </div>
@@ -251,7 +251,7 @@
                 <div class="field">
                   <label class="label">Quantidade Mínima</label>
                   <div class="control">
-                    <input class="input" type="number" step="0.01" name="quantidade_minima" required>
+                    <input class="input" type="number" step="0.01" name="quantidade_minima">
                   </div>
                 </div>
               </div>
@@ -260,7 +260,7 @@
                   <label class="label">Produto Principal</label>
                   <div class="control">
                     <div class="select">
-                      <select name="produto_id_combo" required>
+                      <select name="produto_id_combo" >
                         <option value="">Selecione um produto</option>
                       </select>
                     </div>
@@ -385,17 +385,57 @@
       }
 
       // Alternar campos com base no tipo de promoção
-      function togglePromocaoFields() {
-        const tipo = document.querySelector('#addPromocaoForm select[name="tipo"]').value;
-        document.getElementById('quantidadeFields').style.display = tipo === 'quantidade' ? 'block' : 'none';
-        document.getElementById('comboFields').style.display = tipo === 'combo' ? 'block' : 'none';
-      }
+     function togglePromocaoFields() {
+    const tipo = document.querySelector('#addPromocaoForm select[name="tipo"]').value;
+    const quantidadeFields = document.getElementById('quantidadeFields');
+    const comboFields = document.getElementById('comboFields');
+    const produtoId = document.querySelector('#addPromocaoForm select[name="produto_id"]');
+    const quantidadeMinima = document.querySelector('#addPromocaoForm input[name="quantidade_minima"]');
+    const produtoIdCombo = document.querySelector('#addPromocaoForm select[name="produto_id_combo"]');
+    const produtoIdSecundario = document.querySelector('#addPromocaoForm select[name="produto_id_secundario"]');
+
+    if (tipo === 'quantidade') {
+        quantidadeFields.style.display = 'block';
+        comboFields.style.display = 'none';
+        produtoId.setAttribute('required', 'required');
+        quantidadeMinima.setAttribute('required', 'required');
+        produtoIdCombo.removeAttribute('required');
+        produtoIdSecundario.removeAttribute('required');
+    } else {
+        quantidadeFields.style.display = 'none';
+        comboFields.style.display = 'block';
+        produtoId.removeAttribute('required');
+        quantidadeMinima.removeAttribute('required');
+        produtoIdCombo.setAttribute('required', 'required');
+        produtoIdSecundario.setAttribute('required', 'required');
+    }
+}
 
       function toggleEditPromocaoFields() {
-        const tipo = document.querySelector('#editPromocaoForm select[name="tipo"]').value;
-        document.getElementById('editQuantidadeFields').style.display = tipo === 'quantidade' ? 'block' : 'none';
-        document.getElementById('editComboFields').style.display = tipo === 'combo' ? 'block' : 'none';
-      }
+    const tipo = document.querySelector('#editPromocaoForm select[name="tipo"]').value;
+    const quantidadeFields = document.getElementById('editQuantidadeFields');
+    const comboFields = document.getElementById('editComboFields');
+    const produtoId = document.querySelector('#editPromocaoForm select[name="produto_id"]');
+    const quantidadeMinima = document.querySelector('#editPromocaoForm input[name="quantidade_minima"]');
+    const produtoIdCombo = document.querySelector('#editPromocaoForm select[name="produto_id_combo"]');
+    const produtoIdSecundario = document.querySelector('#editPromocaoForm select[name="produto_id_secundario"]');
+
+    if (tipo === 'quantidade') {
+        quantidadeFields.style.display = 'block';
+        comboFields.style.display = 'none';
+        produtoId.setAttribute('required', 'required');
+        quantidadeMinima.setAttribute('required', 'required');
+        produtoIdCombo.removeAttribute('required');
+        produtoIdSecundario.removeAttribute('required');
+    } else {
+        quantidadeFields.style.display = 'none';
+        comboFields.style.display = 'block';
+        produtoId.removeAttribute('required');
+        quantidadeMinima.removeAttribute('required');
+        produtoIdCombo.setAttribute('required', 'required');
+        produtoIdSecundario.setAttribute('required', 'required');
+    }
+}
 
       // Carregar produtos para os selects
       async function loadProdutos() {

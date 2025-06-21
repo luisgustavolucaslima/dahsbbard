@@ -15,7 +15,7 @@ const CLEANUP_INTERVAL = 20 * 60 * 1000; // 20 minutos
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const db = mysql.createPool({
-  host: 'localhost',
+  host: '127.0.0.1',
   user: 'root',
   password: '',
   database: 'iceclubestoque'

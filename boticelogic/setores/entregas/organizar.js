@@ -158,9 +158,9 @@ async function tratarOrganizarRota(texto, msg, sessao, db, bot, chatId, sessoes,
     // Buscar pedidos válidos atribuídos ao entregador
     try {
       const [pedidos] = await db.query(`
-        SELECT e.id, e.cliente_numero, e.endereco
+        SELECT e.id, e.cliente_numero, e.endereco e.numero_diario
         FROM entregas e
-        JOIN pedidos_diarios p ON e.pedido_id = p.id
+        JOIN pedidos_diarios p ON e.numero_diario = p.id
         WHERE p.valido = 1 AND e.status = 'rua' AND e.entregador_id = ?
       `, [sessaoAtual.usuario_id]);
       console.log(`[DEBUG] Pedidos encontrados: ${pedidos.length}`);
